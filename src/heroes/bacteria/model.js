@@ -434,7 +434,7 @@ export function setLook(model, x, y) {
 export function createPurpleGerm(options = {}) {
   const o = { toon: true, outline: true, outlineWidth: 0.013, outlineColor: 0x14071c, ...options };
   const M = makeMaterials('germ_', o.toon);
-  const C = PURPLE_GERM_PALETTE;
+  const C = { ...PURPLE_GERM_PALETTE, ...(o.palette || {}) }; // o.palette — перекраска для скинов
   const mat = {
     skin: M('skin', C.skin, { rough: 0.28 }),
     lid: M('skin_lid', C.skin, { rough: 0.28, double: true }), hair: M('hair', C.hair, { rough: 0.35 }),

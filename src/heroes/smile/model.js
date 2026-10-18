@@ -438,7 +438,7 @@ export function setLook(model, x, y) {
 export function createSmiley(options = {}) {
   const o = { toon: true, outline: true, outlineWidth: 0.012, outlineColor: 0x2a1206, ...options };
   const M = makeMaterials('smiley_', o.toon);
-  const C = SMILEY_PALETTE;
+  const C = { ...SMILEY_PALETTE, ...(o.palette || {}) }; // o.palette — перекраска для скинов
   const mat = {
     skin: M('skin', 0xffffff, { vc: true, rough: 0.42 }), limb: M('limb', C.limb, { rough: 0.45 }),
     lid: M('skin_lid', C.lid, { rough: 0.45, double: true }), forehead: M('forehead', C.forehead, { rough: 0.45 }),

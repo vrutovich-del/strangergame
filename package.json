@@ -12,12 +12,12 @@
     "qr": "node scripts/make-qr.mjs"
   },
   "dependencies": {
+    "meshoptimizer": "^0.22.0",
     "peerjs": "^1.5.4",
     "three": "^0.170.0"
   },
   "devDependencies": {
     "@types/three": "^0.170.0",
-    "meshoptimizer": "^0.22.0",
     "qrcode": "^1.5.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
