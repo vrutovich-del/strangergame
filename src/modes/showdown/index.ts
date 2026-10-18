@@ -41,6 +41,7 @@ export class Showdown implements ModeRules {
     w.onPickup = (f, p) => {
       if (p.kind !== 'cube') return;
       f.cubes++;
+      f.stats.cubes++;
       const add = f.baseHp * BATTLE.cubeBonus;
       f.maxHp += add; f.hp += add;
       f.dmgMul += levelMul(f.level) * BATTLE.cubeBonus;

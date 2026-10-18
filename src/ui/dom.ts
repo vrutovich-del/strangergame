@@ -61,7 +61,7 @@ export function toast(text: string, kind: 'info' | 'good' | 'bad' = 'info') {
 /** Модальное окно. Возвращает функцию закрытия. */
 export function modal(content: HTMLElement, o: { onClose?: () => void; closable?: boolean; cls?: string } = {}) {
   const back = h('div.modal-back' + (o.cls ? '.' + o.cls : ''));
-  const box = h('div.modal', content);
+  const box = h('div.modal', h('div.modal-inner', content));
   back.appendChild(box);
   const close = () => {
     back.classList.add('hide');

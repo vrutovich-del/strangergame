@@ -71,7 +71,7 @@ export class World implements WorldApi {
       alive: true, deadAt: 0, respawnAt: 0, lastHurt: -99, lastShot: -99, revealUntil: 0, inBush: false,
       gems: 0, cubes: 0, dash: null, knock: null, emote: -1, emoteUntil: 0,
       shotAt: -99, superAt: -99, hurtAt: -99, spawnX: x, spawnY: y,
-      stats: { damage: 0, kills: 0, deaths: 0, gems: 0, supers: 0, hits: 0 },
+      stats: { damage: 0, kills: 0, deaths: 0, gems: 0, supers: 0, hits: 0, cubes: 0 },
     };
     this.fighters.push(f);
     this.emit({ t: 'spawn', id: f.id });

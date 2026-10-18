@@ -81,6 +81,7 @@ export interface FighterStats {
   gems: number;
   supers: number;
   hits: number;
+  cubes: number;
 }
 
 export interface Fighter {

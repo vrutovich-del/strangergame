@@ -97,9 +97,10 @@ export class Showcase {
   frame(aspect: number) {
     this.camera.aspect = aspect;
     const n = Math.max(1, this.chars.length);
-    const dist = n === 1 ? 6.2 : 4.2 + n * 1.5;
-    this.camera.position.set(this.offsetX, 1.75, dist);
-    this.camera.lookAt(this.offsetX, 0.85, 0);
+    // на широких низких экранах (телефон боком) модель делаем чуть меньше и выше
+    const dist = n === 1 ? (aspect > 1.9 ? 8.2 : 7.2) : 4.2 + n * 1.5;
+    this.camera.position.set(this.offsetX, 1.6, dist);
+    this.camera.lookAt(this.offsetX, 0.45, 0);
     this.camera.updateProjectionMatrix();
   }
 
@@ -121,10 +122,10 @@ export function renderPortrait(gl: THREE.WebGLRenderer, heroId: string, skinId: 
   scene.add(c.root);
   c.animate({ t: 0.2, dt: 0, move: 0, shot: 99, sup: 99, hurt: 99, dead: -1, win: false, lose: false, showcase: false, helpers: false, infected: false });
   c.root.rotation.y = -0.35;
-  const cam = new THREE.PerspectiveCamera(26, 1, 0.1, 50);
+  const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
   const h = c.view.height;
-  cam.position.set(0, h * 0.75, 4.3);
-  cam.lookAt(0, h * 0.5, 0);
+  cam.position.set(0, h * 0.62, 3.25);
+  cam.lookAt(0, h * 0.47, 0);
   const rt = new THREE.WebGLRenderTarget(size, size, { colorSpace: THREE.SRGBColorSpace, samples: 4 });
   const prevTarget = gl.getRenderTarget();
   const prevClear = gl.getClearAlpha();

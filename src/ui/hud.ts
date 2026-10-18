@@ -160,6 +160,8 @@ export class Hud {
       this.setBanner(hud.banner, 'round');
     } else if (this.mode === 'showdown') {
       html = `<div class="timer alive">👥 ${hud.alive}</div>${hud.timer > 0 ? `<div class="timer small">☠️ через ${fmtTime(hud.timer)}</div>` : '<div class="timer small poison">☠️ Облако!</div>'}`;
+    } else if (hud.tip) {
+      html = '';
     } else {
       html = `<div class="timer dps">Урон/сек: <b>${hud.dps}</b></div><div class="timer small">Всего: ${hud.total}</div>`;
     }

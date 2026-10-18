@@ -11,7 +11,7 @@ import type { ModeHud } from '../modes/types';
 import { BattleView } from '../render/battleView';
 import type { GameRenderer } from '../render/renderer';
 import type { Match } from '../sim/match';
-import type { FighterInput, MatchResult, SimEvent } from '../sim/types';
+import type { FighterInput, MatchConfig, MatchResult, SimEvent } from '../sim/types';
 import type { World } from '../sim/world';
 import { btn, confirmBox, h } from './dom';
 import { Hud } from './hud';
@@ -19,6 +19,7 @@ import { Hud } from './hud';
 /** Откуда берётся состояние боя: локальная симуляция, хост или клиент сети. */
 export interface BattleSource {
   world: World;
+  cfg: MatchConfig;
   localId: number;
   localTeam: number;
   mode: ModeId;
@@ -46,9 +47,11 @@ export class LocalSource implements BattleSource {
   private quitResult: MatchResult | null = null;
   /** Хост добавляет ввод друзей и рассылает снимки. */
   onTick: (() => void) | null = null;
+  beforeTick: (() => void) | null = null;
   remoteInputs = new Map<number, FighterInput>();
   constructor(public match: Match, public localId: number) {}
   get world() { return this.match.world; }
+  get cfg() { return this.match.cfg; }
   get localTeam() { return this.world.findById(this.localId)?.team ?? 0; }
   get mode() { return this.match.cfg.mode; }
   update(dt: number, sample: () => FighterInput) {
@@ -56,8 +59,10 @@ export class LocalSource implements BattleSource {
     const step = 1 / SIM_HZ;
     this.acc += Math.min(dt, 0.25);
     while (this.acc >= step) {
+      this.beforeTick?.();
+      const local = sample();
       const inputs = new Map(this.remoteInputs);
-      inputs.set(this.localId, sample());
+      inputs.set(this.localId, local);
       this.match.step(inputs);
       this.onTick?.();
       this.acc -= step;
@@ -212,6 +217,7 @@ export class BattleScreen {
       else this.view.setAim({ shape: ai.shape, range: ai.range, width: ai.width, angle: aim.angle, isSuper: aim.kind === 'super', dist: aim.power * ai.range }, w);
     } else this.view.setAim(null, w);
     const hud = src.hud();
+    this.view.setMark(hud.markX >= 0 ? { x: hud.markX, y: hud.markY } : null);
     this.hud.update(hud, {
       ammo: me?.ammo ?? 0, superCharge: me?.superCharge ?? 0, alive: !!me?.alive, respawnIn: src.respawnIn(),
       infected: !!me && w.time < me.infectedUntil, heroColor: '#ffd23f',

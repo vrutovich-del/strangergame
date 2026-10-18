@@ -310,6 +310,34 @@ export class BattleView {
     return g;
   }
 
+  // ───────────────────────── звезда-цель (обучение) ─────────────────────────
+  private mark: THREE.Group | null = null;
+  setMark(p: { x: number; y: number } | null) {
+    if (!p) { if (this.mark) this.mark.visible = false; return; }
+    if (!this.mark) {
+      const g = new THREE.Group();
+      const shape = new THREE.Shape();
+      for (let i = 0; i < 10; i++) { const r = i % 2 ? 0.22 : 0.5, a = (i / 10) * Math.PI * 2 - Math.PI / 2; const x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) shape.lineTo(x, y); else shape.moveTo(x, y); }
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2 });
+      geo.center();
+      const star = new THREE.Mesh(geo, toon(0xffd23f, { emissive: 0xffa000, ei: 0.5 }));
+      star.name = 'star';
+      const ol = new THREE.Mesh(geo, this.outlineMat); ol.scale.setScalar(1.12); star.add(ol);
+      g.add(star);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.95, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.8, depthWrite: false }));
+      ring.name = 'ring'; ring.position.y = 0.05; g.add(ring);
+      this.scene.add(g);
+      this.mark = g;
+    }
+    const g = this.mark;
+    g.visible = true;
+    g.position.set(p.x, 0, p.y);
+    const star = g.getObjectByName('star')!;
+    star.position.y = 1.1 + Math.sin(this.wallClock * 3) * 0.15;
+    star.rotation.y = this.wallClock * 2;
+    g.getObjectByName('ring')!.scale.setScalar(1 + Math.sin(this.wallClock * 5) * 0.12);
+  }
+
   // ───────────────────────── прицел ─────────────────────────
   setAim(a: AimVisual | null, w: World) {
     const me = w.findById(this.localId);
