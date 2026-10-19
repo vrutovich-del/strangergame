@@ -16,6 +16,8 @@ export interface BotGoal {
   shootAt?: P2;
   /** Держаться подальше от врагов (несёт кристаллы). */
   careful?: boolean;
+  /** На каком расстоянии ввязываться в бой (например, в начале Выживания роботы сперва ищут кубы). */
+  engage?: number;
 }
 
 export const DIFFICULTY = {
@@ -76,7 +78,7 @@ export class BotBrain {
     const range = def.attackAim.range;
     const pref = def.ai.range;
     // ── выбор цели ──
-    const target = this.pickTarget(w, team, Math.max(range + 3, this.p.sight));
+    const target = this.pickTarget(w, team, Math.min(Math.max(range + 3, this.p.sight), goal?.engage ?? 99));
     const hpFrac = f.hp / f.maxHp;
     // отступление при низком здоровье
     if (hpFrac < this.p.retreatHp && !(goal && goal.urgency >= 1)) this.retreating = true;

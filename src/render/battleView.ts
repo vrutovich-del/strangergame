@@ -217,28 +217,35 @@ export class BattleView {
     for (const [id, o] of this.projs) if (!seen.has(id)) { o.removeFromParent(); (o as THREE.Sprite).material.dispose(); this.projs.delete(id); }
   }
 
+  /** Помощник Смайла — это граната-смайлик с его ремня, только с крылышками. */
   private makeHelper(m: Minion, w: World): THREE.Group {
     const g = new THREE.Group();
+    const body = new THREE.Group();
+    body.name = 'body';
+    body.rotation.x = -0.6; // лицо чуть вверх — к камере
+    g.add(body);
     const owner = w.findById(m.ownerId);
     const skin = owner ? getSkin(owner.heroId, owner.skinId) : null;
     const color = skin?.shotColor && skin.shotColor > 0 ? skin.shotColor : 0xffc933;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 16), new THREE.MeshToonMaterial({ map: helperFaceTexture(color, m.slot % 3), color: 0xffffff }));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 28, 18), new THREE.MeshToonMaterial({ map: helperFaceTexture(color, m.slot % 3), color: 0xffffff }));
     head.rotation.y = -Math.PI / 2;
     head.name = 'head';
-    g.add(head);
-    const ol = new THREE.Mesh(new THREE.SphereGeometry(0.33, 16, 12), this.outlineMat);
-    g.add(ol);
+    body.add(head);
+    body.add(new THREE.Mesh(new THREE.SphereGeometry(0.44, 18, 12), this.outlineMat));
+    // «чека» гранаты сверху
+    mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.14, 12), toon(0x8e939c), 'cap', body, [0, 0.43, 0]);
+    mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.08, 12), toon(0xa8452c), 'tip', body, [0, 0.53, 0]);
     const wingMat = toon(0xffffff);
-    for (const s of [1, -1]) {
+    for (const sd of [1, -1]) {
       const wgr = new THREE.Group();
-      wgr.name = 'wing' + s;
-      wgr.position.set(0.28 * s, 0.08, -0.05);
-      mesh(new THREE.SphereGeometry(0.16, 12, 8), wingMat, 'w', wgr, [0.12 * s, 0, 0], undefined, [1, 0.25, 0.6]);
-      g.add(wgr);
+      wgr.name = 'wing' + sd;
+      wgr.position.set(0.36 * sd, 0.12, -0.08);
+      mesh(new THREE.SphereGeometry(0.2, 12, 8), wingMat, 'w', wgr, [0.16 * sd, 0, 0], undefined, [1, 0.25, 0.6]);
+      body.add(wgr);
     }
     const sh = new THREE.Mesh(this.shadowGeo, this.shadowMat);
-    sh.scale.setScalar(0.6);
-    sh.name = 'shadow';
+    sh.scale.setScalar(0.75);
+    sh.position.y = 0.02;
     g.add(sh);
     this.scene.add(g);
     return g;
@@ -251,21 +258,24 @@ export class BattleView {
       let g = this.minions.get(m.id);
       if (!g) { g = this.makeHelper(m, w); this.minions.set(m.id, g); }
       const x = lerp(m.px, m.x, alpha), y = lerp(m.py, m.y, alpha);
-      const t = this.wallClock * 1 + m.slot;
-      const fly = 1.15 + Math.sin(t * 4) * 0.12;
+      const t = this.wallClock + m.slot;
+      const body = g.getObjectByName('body')!;
+      // появляются с «поп» и покачиваются в полёте
+      const born = Math.min(1, (w.time - m.bornAt) / 0.25);
+      body.position.y = 1.25 + Math.sin(t * 4) * 0.12;
+      body.rotation.z = Math.sin(t * 3) * 0.15;
       g.position.set(x, 0, y);
-      g.children.forEach((c) => { if (c.name !== 'shadow') c.position.y = fly + (c.name.startsWith('wing') ? 0.08 : 0); });
       g.rotation.y = Math.PI / 2 - m.facing;
       const flap = Math.sin(this.wallClock * 30) * 0.6;
-      g.getObjectByName('wing1')!.rotation.z = flap;
-      g.getObjectByName('wing-1')!.rotation.z = -flap;
+      body.getObjectByName('wing1')!.rotation.z = flap;
+      body.getObjectByName('wing-1')!.rotation.z = -flap;
       const age = w.time - m.shotAt;
-      const head = g.getObjectByName('head')!;
-      head.scale.setScalar(age < 0.15 ? 1.15 : 1);
+      body.scale.setScalar(born * (age < 0.15 ? 1.15 : 1));
       // в конце жизни мигают
       g.visible = !(m.expiresAt - w.time < 1 && Math.sin(this.wallClock * 25) > 0.3);
       const hurt = w.time - m.hurtAt;
-      ((head as THREE.Mesh).material as THREE.MeshToonMaterial).emissive.setScalar(hurt < 0.12 ? 0.8 : 0);
+      const head = body.getObjectByName('head') as THREE.Mesh;
+      (head.material as THREE.MeshToonMaterial).emissive.setScalar(hurt < 0.12 ? 0.8 : 0);
       void dt;
     }
     for (const [id, g] of this.minions) if (!seen.has(id)) { g.removeFromParent(); this.minions.delete(id); }

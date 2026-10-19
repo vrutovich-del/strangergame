@@ -92,27 +92,32 @@ export class Showdown implements ModeRules {
 
   botGoal(m: Match, f: Fighter): BotGoal | null {
     const w = m.world;
+    // пока нет облака, роботы сперва копят кубы и дерутся только с теми, кто рядом
+    let engage = w.time < 25 ? 0 : w.time < R.poisonStart ? 3.5 : w.time < R.poisonStart + 25 ? 6 : 99;
+    // на того, кто напал, отвечают всегда
+    if (w.time - f.lastHurt < 2) engage = Math.max(engage, 5);
     const z = zoneGoal(m, f);
-    if (z) return z;
+    if (z) return { ...z, engage };
     // кубы рядом
     const cube = nearest(w.pickups.filter((p) => p.kind === 'cube'), f);
-    if (cube && dist2(cube.x, cube.y, f.x, f.y) < 81) return { x: cube.x, y: cube.y, urgency: 0.6 };
+    if (cube && dist2(cube.x, cube.y, f.x, f.y) < 81) return { x: cube.x, y: cube.y, urgency: 0.6, engage };
     // ящики с кубами
-    let best: { x: number; y: number } | null = null, bd = 144;
+    let best: { x: number; y: number } | null = null, bd = 260;
     for (const b of w.map.boxes) {
       if (w.map.get(b.x, b.y) !== T.Box) continue;
-      const d = dist2(b.x + 0.5, b.y + 0.5, f.x, f.y);
+      // свои ящики — поближе к месту старта, чтобы роботы не толпились у одного
+      const d = dist2(b.x + 0.5, b.y + 0.5, f.x, f.y) + 0.6 * dist2(b.x + 0.5, b.y + 0.5, f.spawnX, f.spawnY);
       if (d < bd) { bd = d; best = { x: b.x + 0.5, y: b.y + 0.5 }; }
     }
     if (best) {
       const stand = w.map.nearestFree(best.x + (f.x - best.x) * 0.4, best.y + (f.y - best.y) * 0.4) ?? best;
-      return { x: stand.x, y: stand.y, urgency: 0.4, shootAt: best };
+      return { x: stand.x, y: stand.y, urgency: 0.4, shootAt: best, engage };
     }
     const e = nearestEnemy(m, f);
-    if (e && f.hp / f.maxHp > 0.55) return { x: e.x, y: e.y, urgency: 0.3 };
+    if (e && f.hp / f.maxHp > 0.55 && w.time > R.poisonStart * 0.6) return { x: e.x, y: e.y, urgency: 0.3, engage };
     const cx = w.map.w / 2, cy = w.map.h / 2;
     const p = w.map.nearestFree(cx + (f.x - cx) * 0.6, cy + (f.y - cy) * 0.6) ?? { x: cx, y: cy };
-    return { x: p.x, y: p.y, urgency: 0.2 };
+    return { x: p.x, y: p.y, urgency: 0.2, engage };
   }
 
   hud(m: Match): ModeHud {
