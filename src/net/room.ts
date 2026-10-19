@@ -7,16 +7,8 @@ import type { ModeId } from '../maps/types';
 import type { MatchConfig } from '../sim/types';
 import { PROTOCOL_VERSION, type NetMsg, type RoomPlayer } from './protocol';
 
-/** Буквы без похожих символов (нет 0/O и 1/I). */
-export const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-export function randomCode(n = 5) {
-  let s = '';
-  for (let i = 0; i < n; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
-  return s;
-}
-export function normalizeCode(s: string) {
-  return s.toUpperCase().replace(/[^23456789A-HJ-NP-Z]/g, '').slice(0, 5);
-}
+import { randomCode } from './code';
+export { CODE_ALPHABET, normalizeCode, randomCode } from './code';
 
 export const MAX_PLAYERS = 3;
 
