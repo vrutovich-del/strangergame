@@ -5,8 +5,10 @@ import { claimRoad, totalTrophies } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
 import { rewardCard, topBar } from '../common';
-import { btn, h } from '../dom';
-import { boxOverlay } from './boxes';
+import { getHero } from '../../heroes/registry';
+import { RARITY } from '../../heroes/rarity';
+import { btn, h, modal } from '../dom';
+import { boxOverlay, rewardReveal } from './boxes';
 import type { Screen } from './index';
 import { enableDragScroll } from './shop';
 
@@ -22,14 +24,19 @@ export function roadScreen(app: App): Screen {
     const future = m.reward.kind === 'future';
     return h('div.road-item' + (reached ? '.reached' : '') + (claimed ? '.claimed' : '') + (future ? '.future' : ''),
       h('div.ri-at.t', '🏆 ' + m.at),
-      future ? h('div.reward-card.future', h('div.rc-icon', '🦸'), h('div.rc-text.t', 'Новый герой'), h('div.soon-tag', 'Скоро!')) : rewardCard(m.reward as any),
+      future ? h('div.reward-card.future', h('div.rc-icon', '🦸'), h('div.rc-text.t', 'Новый герой'), h('div.soon-tag', 'Скоро!'))
+        : m.reward.kind === 'hero' ? h('div.reward-card.hero', { style: { '--rc': RARITY[getHero(m.reward.heroId).rarity ?? 'common'].color } as any }, h('img.rc-img', { src: app.portrait(m.reward.heroId) }), h('div.rc-text.t', getHero(m.reward.heroId).name))
+        : rewardCard(m.reward as any),
       future ? null : claimed ? h('div.sold.t', 'Получено ✔') : reached ? btn('Забрать', () => {
         const rw = m.reward;
         const got = claimRoad(s, m.at);
         store.commit();
         if (!got) return;
         if (rw.kind === 'box') boxOverlay(app, rw.box, got, refresh);
-        else { sfx('reward'); refresh(); }
+        else if (rw.kind === 'hero' && got[0]) {
+          sfx('levelup');
+          modal(h('div.col.center', rewardReveal(app, got[0]), got[0].kind === 'gems' ? h('p.small', 'Этот герой уже был — держи кристаллы!') : null), { onClose: refresh });
+        } else { sfx('reward'); refresh(); }
       }, 'btn-green', { class: 'btn-sm' }) : h('div.locked-tag', '🔒'),
     );
   });

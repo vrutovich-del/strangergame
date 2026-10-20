@@ -4,6 +4,7 @@ import { playableHeroes } from '../../heroes/registry';
 import { skinsOf } from '../../heroes/skins';
 import { mapsForMode, type ModeId } from '../../maps';
 import { MODE_INFO } from '../../modes';
+import { ownsHero } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
 import { topBar } from '../common';
@@ -41,7 +42,8 @@ export function trainingPicker(app: App) {
       topBar(app, { title: 'Полигон: примерочная', back: true }),
       h('div.scroll',
         h('div.sec-title.t', 'Герой (уровень 9)'),
-        h('div.row', ...playableHeroes().map((d) => h('div.pick' + (d.id === hero ? '.on' : ''), { onclick: () => { hero = d.id; skin = 'default'; sfx('tab'); render(); } }, h('img', { src: app.portrait(d.id) }), h('div.t', d.name)))),
+        h('div.row', ...playableHeroes().map((d) => h('div.pick' + (d.id === hero ? '.on' : ''), { onclick: () => { hero = d.id; skin = 'default'; sfx('tab'); render(); } }, h('img', { src: app.portrait(d.id) }), h('div.t', d.name + (ownsHero(store.data, d.id) ? '' : ' 🔒'))))),
+        h('div.small', 'Здесь можно попробовать даже ещё не открытых героев.'),
         h('div.sec-title.t', 'Скин (примерка бесплатно)'),
         h('div.row', ...skinsOf(hero).map((k) => h('div.pick' + (k.id === skin ? '.on' : ''), { onclick: () => { skin = k.id; sfx('tab'); render(); } }, h('img', { src: app.portrait(hero, k.id) }), h('div.t', k.name)))),
         h('div.row', btn('В БОЙ!', () => app.playTraining(hero, skin), 'btn-yellow', { class: 'btn-play' })),

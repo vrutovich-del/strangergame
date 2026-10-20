@@ -1,9 +1,13 @@
 // Вся экономика игры в одном месте: цены, награды, таблицы ящиков, дорога трофеев, пропуск, задания.
 // Никаких реальных платежей: всё покупается за игровую валюту, которая зарабатывается в игре.
+import type { Rarity } from '../heroes/rarity';
 import type { ModeId } from '../maps/types';
 
 export type Currency = 'coins' | 'gems' | 'bling';
 export type BoxKind = 'common' | 'big' | 'mega';
+
+/** Редкость Старр-дропа (обычных дропов не бывает). */
+export type DropRarity = Exclude<Rarity, 'common'>;
 
 /** Награда: что-то одно из списка. */
 export type Reward =
@@ -48,16 +52,38 @@ export const ECONOMY = {
   boxes: {
     common: {
       name: 'Обычный ящик', price: { currency: 'coins' as Currency, amount: 100 }, color: '#3fa9ff',
-      coins: [20, 40], bling: { chance: 0.3, min: 5, max: 15 }, gems: { chance: 0.1, min: 2, max: 5 }, skin: 0.01,
+      coins: [20, 40], bling: { chance: 0.3, min: 5, max: 15 }, gems: { chance: 0.1, min: 2, max: 5 }, skin: 0.01, hero: 0.01,
     },
     big: {
       name: 'Большой ящик', price: { currency: 'gems' as Currency, amount: 30 }, color: '#b45cff',
-      coins: [60, 120], bling: { chance: 0.5, min: 15, max: 40 }, gems: { chance: 0.25, min: 5, max: 10 }, skin: 0.04,
+      coins: [60, 120], bling: { chance: 0.5, min: 15, max: 40 }, gems: { chance: 0.25, min: 5, max: 10 }, skin: 0.04, hero: 0.03,
     },
     mega: {
       name: 'Мега-ящик', price: { currency: 'gems' as Currency, amount: 80 }, color: '#ff4b55',
-      coins: [150, 300], bling: { chance: 0.8, min: 40, max: 90 }, gems: { chance: 0.5, min: 10, max: 25 }, skin: 0.12,
+      coins: [150, 300], bling: { chance: 0.8, min: 40, max: 90 }, gems: { chance: 0.5, min: 10, max: 25 }, skin: 0.12, hero: 0.07,
     },
+  },
+  /** Герои: чем реже герой, тем меньше шанс, что выпадет именно он. Повтор превращается в кристаллы. */
+  heroes: {
+    weight: { common: 1, rare: 1, superrare: 0.7, epic: 0.45, mythic: 0.25, legendary: 0.12 } as Record<Rarity, number>,
+    duplicateGems: { common: 20, rare: 40, superrare: 60, epic: 100, mythic: 150, legendary: 250 } as Record<Rarity, number>,
+  },
+  /**
+   * Старр-дроп: выдаётся за каждую победу. Редкость определяется сразу, а при открытии дроп «повышается»
+   * по ступенькам до неё. Внутри — одна награда по весам. Героя дроп даёт не реже своей редкости:
+   * из Редкого — только редкого героя, из Эпического — до эпического и т.д.
+   */
+  starrDrop: {
+    odds: { rare: 0.5, superrare: 0.28, epic: 0.15, mythic: 0.05, legendary: 0.02 } as Record<DropRarity, number>,
+    loot: {
+      rare: [{ w: 48, kind: 'coins', min: 25, max: 50 }, { w: 30, kind: 'bling', min: 10, max: 20 }, { w: 18, kind: 'gems', min: 2, max: 4 }, { w: 4, kind: 'hero' }],
+      superrare: [{ w: 42, kind: 'coins', min: 60, max: 100 }, { w: 26, kind: 'bling', min: 25, max: 45 }, { w: 17, kind: 'gems', min: 5, max: 8 }, { w: 7, kind: 'box', box: 'common' }, { w: 8, kind: 'hero' }],
+      epic: [{ w: 28, kind: 'coins', min: 120, max: 200 }, { w: 20, kind: 'bling', min: 50, max: 90 }, { w: 16, kind: 'gems', min: 10, max: 15 }, { w: 12, kind: 'box', box: 'big' }, { w: 12, kind: 'skin' }, { w: 12, kind: 'hero' }],
+      mythic: [{ w: 16, kind: 'coins', min: 250, max: 400 }, { w: 14, kind: 'bling', min: 100, max: 160 }, { w: 16, kind: 'gems', min: 20, max: 30 }, { w: 14, kind: 'box', box: 'mega' }, { w: 18, kind: 'skin' }, { w: 22, kind: 'hero' }],
+      legendary: [{ w: 14, kind: 'gems', min: 40, max: 60 }, { w: 14, kind: 'box', box: 'mega' }, { w: 27, kind: 'skin' }, { w: 45, kind: 'hero' }],
+    } as Record<DropRarity, DropLoot[]>,
+    /** Если подходящего героя или скина нет (всё уже есть) — кристаллы. */
+    fallbackGems: { rare: 4, superrare: 8, epic: 15, mythic: 30, legendary: 60 } as Record<DropRarity, number>,
   },
   /** Магазин кристаллов: выглядит как донат, но всё за игровую валюту или бесплатно. */
   gemShop: [
@@ -80,10 +106,17 @@ export const ECONOMY = {
   questReward: { xp: 100 },
 };
 
+/** Одна строка таблицы Старр-дропа. */
+export type DropLoot =
+  | { w: number; kind: 'coins' | 'gems' | 'bling'; min: number; max: number }
+  | { w: number; kind: 'box'; box: BoxKind }
+  | { w: number; kind: 'skin' | 'hero' };
+
 /** Дорога трофеев (по общему числу трофеев). */
 export const TROPHY_ROAD: { at: number; reward: Reward | { kind: 'future'; text: string } }[] = [
   { at: 10, reward: { kind: 'coins', amount: 50 } },
   { at: 25, reward: { kind: 'box', box: 'common' } },
+  { at: 40, reward: { kind: 'hero', heroId: 'bacteria' } },
   { at: 50, reward: { kind: 'gems', amount: 20 } },
   { at: 75, reward: { kind: 'bling', amount: 60 } },
   { at: 100, reward: { kind: 'box', box: 'big' } },
@@ -92,7 +125,7 @@ export const TROPHY_ROAD: { at: number; reward: Reward | { kind: 'future'; text:
   { at: 300, reward: { kind: 'skin', heroId: 'bacteria', skinId: 'rainbow' } },
   { at: 400, reward: { kind: 'box', box: 'mega' } },
   { at: 500, reward: { kind: 'gems', amount: 50 } },
-  { at: 600, reward: { kind: 'future', text: 'Новый герой' } },
+  { at: 600, reward: { kind: 'hero', heroId: 'lion' } },
   { at: 750, reward: { kind: 'coins', amount: 300 } },
   { at: 900, reward: { kind: 'bling', amount: 150 } },
   { at: 1000, reward: { kind: 'box', box: 'mega' } },

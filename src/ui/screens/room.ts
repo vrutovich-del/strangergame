@@ -1,15 +1,16 @@
-// Друзья: создать комнату или войти по коду. До 3 игроков в одной команде, пустые места — роботы.
+// Друзья: комната создаётся сразу — остаётся сказать код. Или ввести код друга: вход сам, без лишних кнопок.
+// До 3 игроков в одной команде, пустые места — роботы. Хост жмёт «ИГРАТЬ», остальным ничего нажимать не надо.
 // Безопасность: нет случайного подбора с незнакомцами и нет текстового чата — только код от друга.
 import { sfx } from '../../audio/sfx';
 import { randomSeed } from '../../core/rng';
-import { getHero, playableHeroes } from '../../heroes/registry';
+import { playableHeroes } from '../../heroes/registry';
 import { getSkin, skinsOf } from '../../heroes/skins';
 import type { ModeId } from '../../maps/types';
 import { MODE_INFO } from '../../modes';
 import { buildLineup } from '../../modes/lineup';
 import { ClientSource, HostSource } from '../../net/netBattle';
 import { MAX_PLAYERS, normalizeCode, Room } from '../../net/room';
-import { difficultyFor, heroProgress, ownsSkin } from '../../meta/progress';
+import { difficultyFor, heroProgress, ownsHero, ownsSkin } from '../../meta/progress';
 import { store } from '../../meta/store';
 import { Match } from '../../sim/match';
 import type { MatchConfig } from '../../sim/types';
@@ -24,35 +25,34 @@ function meInfo(app: App) {
   return { nick: store.data.nick || 'Игрок', hero: lo.heroId, skin: lo.skinId, level: lo.level };
 }
 
+const roomMode = (): ModeId => (store.data.selectedMode === 'training' ? 'gemgrab' : store.data.selectedMode);
+
 export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): Screen {
   const el = h('div.screen.panel-screen.room');
   let disposed = false;
+  let busy = false;
   const room: Room | null = app.room && app.room.alive ? app.room : null;
 
-  const renderStart = (err = '') => {
+  /** Поле «код друга»: как только набраны 5 символов — сразу входим. */
+  const codeField = () => {
+    const input = h('input.code-input', { maxLength: 5, placeholder: 'КОД', autocapitalize: 'characters', autocomplete: 'off', spellcheck: false, inputMode: 'text' }) as HTMLInputElement;
+    input.addEventListener('input', () => {
+      input.value = normalizeCode(input.value);
+      if (input.value.length === 5) join(input.value);
+    });
+    return h('div.join-box', h('div.t', '🔑 Или введи код друга:'), input);
+  };
+
+  const renderError = (err: string) => {
     el.innerHTML = '';
-    const codeInput = h('input.code-input', { maxLength: 5, placeholder: 'КОД', autocapitalize: 'characters', autocomplete: 'off', spellcheck: false }) as HTMLInputElement;
-    codeInput.addEventListener('input', () => { codeInput.value = normalizeCode(codeInput.value); });
     el.append(
       topBar(app, { title: 'Игра с друзьями', back: true }),
       h('div.scroll.room-start',
-        h('p.room-info', 'Играйте вместе в одной команде против роботов! Позови до двух друзей.'),
+        h('div.room-error', err),
         h('div.room-cards',
-          h('div.room-card',
-            h('div.rc-big', '🏠'),
-            h('div.t', 'Создать комнату'),
-            h('div.small', 'Получишь код, который нужно сказать друзьям.'),
-            btn('СОЗДАТЬ', () => create(), 'btn-yellow'),
-          ),
-          h('div.room-card',
-            h('div.rc-big', '🔑'),
-            h('div.t', 'Войти по коду'),
-            codeInput,
-            btn('ВОЙТИ', () => join(codeInput.value), 'btn-green'),
-          ),
+          h('div.room-card', h('div.rc-big', '🏠'), h('div.t', 'Своя комната'), btn('СОЗДАТЬ', () => create(), 'btn-yellow')),
+          h('div.room-card', codeField()),
         ),
-        err ? h('div.room-error', err) : null,
-        h('p.small', 'Чата нет — только эмоции. Играйте с теми, кого знаете.'),
       ),
     );
   };
@@ -63,33 +63,49 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
   };
 
   const create = async () => {
+    if (busy) return;
+    busy = true;
     renderWait('Создаём комнату…');
     try {
-      const r = await Room.create(meInfo(app), store.data.selectedMode === 'training' ? 'gemgrab' : store.data.selectedMode);
+      const r = await Room.create(meInfo(app), roomMode());
       if (disposed) { r.leave(); return; }
       app.room = r;
       wire(r);
       renderRoom(r);
-    } catch (e: any) { renderStart(e?.message || 'Не получилось создать комнату.'); }
+    } catch (e: any) { if (!disposed) renderError(e?.message || 'Не получилось создать комнату.'); }
+    finally { busy = false; }
   };
 
   const join = async (code: string) => {
     code = normalizeCode(code);
     if (code.length !== 5) { toast('Код — это 5 символов', 'bad'); return; }
-    renderWait('Подключаемся к комнате ' + code + '…');
+    const cur: Room | null = app.room && app.room.alive ? app.room : null;
+    if (cur?.code === code) return;
+    if (busy) return;
+    busy = true;
+    // своя пустая комната больше не нужна
+    if (cur) { offs.forEach((f) => f()); offs.length = 0; cur.leave(); app.room = null; }
+    renderWait('Заходим в комнату ' + code + '…');
     try {
       const r = await Room.join(code, meInfo(app));
       if (disposed) { r.leave(); return; }
       app.room = r;
       wire(r);
+      sfx('reward');
       renderRoom(r);
-    } catch (e: any) { renderStart(e?.message || 'Не получилось войти.'); }
+    } catch (e: any) { if (!disposed) renderError(e?.message || 'Не получилось войти.'); }
+    finally { busy = false; }
   };
 
   const offs: (() => void)[] = [];
   const wire = (r: Room) => {
-    offs.push(r.on('roster', () => { if (!disposed && !r.inGame) renderRoom(r); }));
-    offs.push(r.on('closed', (why) => { app.room = null; if (!disposed) renderStart(why); }));
+    let count = r.players.length;
+    offs.push(r.on('roster', () => {
+      if (r.role === 'host' && r.players.length > count) { sfx('reward'); toast('Друг в комнате!', 'good'); }
+      count = r.players.length;
+      if (!disposed && !r.inGame) renderRoom(r);
+    }));
+    offs.push(r.on('closed', (why) => { app.room = null; if (!disposed) renderError(why); }));
     offs.push(r.on('error', (msg) => { if (!disposed) toast(msg, 'bad'); }));
     offs.push(r.on('start', (cfg) => startGame(r, cfg)));
   };
@@ -116,6 +132,8 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
     el.innerHTML = '';
     const isHost = r.role === 'host';
     const me = r.players.find((p) => p.id === r.myId);
+    const host = r.players.find((p) => p.host);
+    const alone = r.players.length <= 1;
     const slots: HTMLElement[] = [];
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const p = r.players[i];
@@ -123,13 +141,12 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
         ? h('div.room-slot' + (p.id === r.myId ? '.me' : ''),
           h('img', { src: app.portrait(p.hero, p.skin) }),
           h('div.t', (p.host ? '👑 ' : '') + p.nick),
-          h('div.small', `${getSkin(p.hero, p.skin).name} · ур. ${p.level}`),
-          h('div.ready' + (p.ready || p.host ? '.on' : ''), p.host ? 'Хост' : p.ready ? '✔ Готов' : '⏳ Ждём'))
-        : h('div.room-slot.empty', h('div.rc-big', '🤖'), h('div.small', 'Здесь будет робот-напарник')));
+          h('div.small', `${getSkin(p.hero, p.skin).name} · ур. ${p.level}`))
+        : h('div.room-slot.empty', h('div.rc-big', '🤖'), h('div.small', isHost && i === 1 ? 'Скажи другу код — он появится здесь' : 'Здесь будет робот-напарник')));
     }
-    // выбор своего героя и скина
+    // выбор своего героя и скина (только открытые герои)
     const s = store.data;
-    const heroBtns = playableHeroes().map((d) => {
+    const heroBtns = playableHeroes().filter((d) => ownsHero(s, d.id)).map((d) => {
       const hp = heroProgress(s, d.id);
       return h('div.pick' + (me?.hero === d.id ? '.on' : ''), {
         onclick: () => {
@@ -140,11 +157,13 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
       }, h('img', { src: app.portrait(d.id, ownsSkin(s, d.id, hp.skin) ? hp.skin : 'default') }), h('div.t', d.name));
     });
     const myHero = me?.hero ?? s.selectedHero;
-    const skinBtns = skinsOf(myHero).filter((k) => ownsSkin(s, myHero, k.id)).map((k) => h('div.pick.small' + (me?.skin === k.id ? '.on' : ''), {
+    const mySkins = skinsOf(myHero).filter((k) => ownsSkin(s, myHero, k.id));
+    const skinBtns = mySkins.length > 1 ? mySkins.map((k) => h('div.pick.small' + (me?.skin === k.id ? '.on' : ''), {
       onclick: () => { heroProgress(s, myHero).skin = k.id; store.commit(); sfx('tab'); r.setMe({ skin: k.id }); if (isHost) renderRoom(r); },
-    }, h('img', { src: app.portrait(myHero, k.id) })));
-    const modes = (['gemgrab', 'showdown', 'knockout'] as ModeId[]).map((m) => btn(MODE_INFO[m].icon + ' ' + MODE_INFO[m].name, () => { if (isHost) { r.setMode(m); sfx('tab'); } }, r.mode === m ? 'btn-yellow' : 'btn-gray', { class: 'btn-sm' + (isHost ? '' : ' disabled') }));
-    const allReady = r.players.every((p) => p.host || p.ready);
+    }, h('img', { src: app.portrait(myHero, k.id) }))) : [];
+    const modes = (['gemgrab', 'showdown', 'knockout'] as ModeId[]).map((m) => isHost
+      ? btn(MODE_INFO[m].icon + ' ' + MODE_INFO[m].name, () => { r.setMode(m); s.selectedMode = m; store.commit(); sfx('tab'); }, r.mode === m ? 'btn-yellow' : 'btn-gray', { class: 'btn-sm' })
+      : h('div.mode-chip.t' + (r.mode === m ? '.on' : ''), MODE_INFO[m].icon + ' ' + MODE_INFO[m].name));
     const share = async () => {
       const text = `Заходи ко мне в «Игру странностей»! Код комнаты: ${r.code}`;
       try {
@@ -152,30 +171,33 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
         else { await navigator.clipboard.writeText(r.link); toast('Ссылка скопирована!', 'good'); }
       } catch { /* отменили */ }
     };
+    const play = isHost
+      ? btn(alone ? 'ИГРАТЬ С РОБОТАМИ' : 'ИГРАТЬ!', () => {
+        const humans = r.players.map((p) => ({ name: p.nick, heroId: p.hero, skinId: p.skin, level: p.level, owner: p.id }));
+        const cfg = buildLineup({ mode: r.mode, humans, difficulty: difficultyFor(s, me?.hero ?? 'smile'), seed: randomSeed() });
+        r.start(cfg);
+      }, 'btn-yellow', { class: 'btn-play' + (alone ? ' small-play' : '') })
+      : h('div.room-waiting.t', h('div.mm-spin'), `Ждём, когда ${host?.nick ?? 'хост'} нажмёт «Играть»`);
     el.append(
-      topBar(app, { title: 'Комната', back: true }),
+      topBar(app, { title: isHost ? 'Твоя комната' : 'Комната друга', back: true }),
       h('div.scroll.room-body',
-        h('div.room-code-box', h('div.small', 'Код комнаты'), h('div.room-code.t', r.code), btn('📤 Поделиться ссылкой', share, 'btn-blue', { class: 'btn-sm' })),
+        h('div.room-top',
+          h('div.room-code-box',
+            h('div.col', h('div.small', isHost ? 'Скажи друзьям код:' : 'Код комнаты'), h('div.room-code.t', r.code)),
+            isHost ? btn('📤 Позвать', share, 'btn-blue', { class: 'btn-sm' }) : null,
+          ),
+          isHost && alone ? codeField() : null,
+        ),
         h('div.room-slots', ...slots),
+        h('div.row.room-actions', play),
         h('div.sec-title.t', 'Твой герой'),
         h('div.row', ...heroBtns, ...skinBtns),
-        h('div.sec-title.t', isHost ? 'Режим (выбираешь ты)' : 'Режим (выбирает хост)'),
+        h('div.sec-title.t', isHost ? 'Режим' : 'Режим (выбирает хост)'),
         h('div.row', ...modes),
-        h('div.row.room-actions',
-          btn('Выйти', () => { r.leave(); app.room = null; renderStart(); }, 'btn-red'),
-          isHost
-            ? btn('ИГРАТЬ', () => {
-              if (!allReady) { toast('Ждём, пока все нажмут «Готов»', 'bad'); return; }
-              const humans = r.players.map((p) => ({ name: p.nick, heroId: p.hero, skinId: p.skin, level: p.level, owner: p.id }));
-              const cfg = buildLineup({ mode: r.mode, humans, difficulty: difficultyFor(s, me?.hero ?? 'smile'), seed: randomSeed() });
-              r.start(cfg);
-            }, allReady ? 'btn-yellow' : 'btn-gray', { class: 'btn-play' + (allReady ? '' : ' disabled') })
-            : btn(me?.ready ? '✔ Готов!' : 'Я ГОТОВ', () => { r.setMe({ ready: !me?.ready }); sfx('tab'); }, me?.ready ? 'btn-green' : 'btn-yellow', { class: 'btn-play' }),
-        ),
-        h('p.small', isHost ? 'Пустые места в команде займут роботы-напарники. Соперники — роботы.' : 'Хост запустит бой, когда все будут готовы.'),
+        h('div.row', btn(isHost ? 'Закрыть комнату' : 'Выйти из комнаты', () => { offs.forEach((f) => f()); offs.length = 0; r.leave(); app.room = null; app.toLobby(); }, 'btn-red', { class: 'btn-sm' })),
+        h('p.small', 'Пустые места в команде займут роботы-напарники. Соперники — роботы. Чата нет — только эмоции.'),
       ),
     );
-    void getHero;
   };
 
   if (room) {
@@ -185,8 +207,12 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
   } else if (arg?.join) {
     history.replaceState(null, '', location.pathname + location.search);
     setTimeout(() => join(arg.join!), 50);
-    renderWait('Подключаемся…');
-  } else renderStart();
+    renderWait('Заходим в комнату…');
+  } else {
+    // комнату создаём сразу — остаётся только сказать код другу
+    setTimeout(() => create(), 30);
+    renderWait('Создаём комнату…');
+  }
 
   return {
     el,
@@ -194,6 +220,9 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
       disposed = true;
       offs.forEach((f) => f());
       stopVs();
+      // своя пустая комната не нужна, когда ушли с экрана
+      const r: Room | null = app.room;
+      if (r && r.alive && r.role === 'host' && r.players.length <= 1 && !r.inGame) { r.leave(); app.room = null; }
     },
   };
 }

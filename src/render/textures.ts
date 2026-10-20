@@ -98,6 +98,27 @@ export function energyTexture(color: number) {
   }));
 }
 
+/** Удар когтями: три изогнутые царапины (дугой к +X, поворачивается по направлению удара). */
+export function clawTexture(color = 0xffc24a, mirror = false) {
+  return cached(`claw:${color}:${mirror}`, () => canvasTexture(128, (g, s) => {
+    const c = s / 2;
+    g.translate(c, c);
+    if (mirror) g.scale(1, -1);
+    g.lineCap = 'round';
+    for (let i = -1; i <= 1; i++) {
+      const r = s * 0.36 + i * 9, a0 = -0.95 + i * 0.05, a1 = 0.95 + i * 0.05;
+      // светящийся след
+      g.strokeStyle = hexStr(color) + '66'; g.lineWidth = 15;
+      g.beginPath(); g.arc(-s * 0.18, 0, r, a0, a1); g.stroke();
+      // острая царапина
+      g.strokeStyle = '#ffffff'; g.lineWidth = 6;
+      g.beginPath(); g.arc(-s * 0.18, 0, r, a0 + 0.12, a1 - 0.12); g.stroke();
+      g.strokeStyle = hexStr(color); g.lineWidth = 3;
+      g.beginPath(); g.arc(-s * 0.18, 0, r + 3, a0 + 0.2, a1 - 0.2); g.stroke();
+    }
+  }));
+}
+
 /** Мягкое круглое пятно (тени, вспышки). */
 export function blobTexture() {
   return cached('blob', () => canvasTexture(64, (g, s) => {

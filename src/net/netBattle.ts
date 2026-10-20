@@ -15,11 +15,56 @@ import type { Room } from './room';
 
 const SNAP_EVERY = 0.05; // 20 снимков в секунду
 
+/** Сколько секунд реально прошло с прошлого кадра (цикл кадров обрезает dt до 0,1 с,
+ *  а сетевому бою нужно идти вровень с настоящими часами, иначе снимки и ввод разъезжаются). */
+function realClock() {
+  let last = 0;
+  return (fallback: number) => {
+    const now = performance.now();
+    const d = last ? (now - last) / 1000 : fallback;
+    last = now;
+    return Math.max(0, Math.min(0.5, d));
+  };
+}
+
+/** Склеить два ввода в один тик: движение за два шага, действие — последнее. */
+export function mergeInputs(a: FighterInput, b: FighterInput): FighterInput {
+  const out: FighterInput = { ...b, mx: (a.mx + b.mx) / 2, my: (a.my + b.my) / 2, steps: (a.steps ?? 1) + (b.steps ?? 1) };
+  if (!b.attack && !b.superAttack && (a.attack || a.superAttack)) { out.attack = a.attack; out.superAttack = a.superAttack; out.aim = a.aim; out.power = a.power; }
+  if (b.emote < 0 && a.emote >= 0) out.emote = a.emote;
+  return out;
+}
+
+/** Очередь ввода одного друга у хоста: ровно один ввод на тик, как у него на экране,
+ *  и небольшой запас против пачек пакетов по Wi‑Fi. Тогда предсказание движения у друга совпадает с хостом. */
+export class InputQueue {
+  q: FighterInput[] = [];
+  private primed = false;
+  push(i: FighterInput) {
+    this.q.push(i);
+    // совсем отстали — старое движение выбрасываем, но выстрелы не теряем
+    while (this.q.length > 45) {
+      const old = this.q.shift()!, nx = this.q[0];
+      this.q[0] = { ...mergeInputs(old, nx), mx: nx.mx, my: nx.my, steps: nx.steps };
+    }
+  }
+  /** Ввод на этот тик или null (ввод опоздал — этот шаг друг сделает позже). */
+  next(): FighterInput | null {
+    if (!this.primed) { if (this.q.length < 2) return null; this.primed = true; }
+    if (!this.q.length) { this.primed = false; return null; }
+    let inp = this.q.shift()!;
+    // очередь растёт (у хоста подтормаживало) — догоняем: два шага за тик
+    if (this.q.length > 4) inp = mergeInputs(inp, this.q.shift()!);
+    return inp;
+  }
+}
+
 /** Хост: обычная симуляция + ввод друзей + рассылка снимков. */
 export class HostSource extends LocalSource {
   canPause = false;
-  private queues = new Map<string, FighterInput[]>();
+  private queues = new Map<string, InputQueue>();
   private acks = new Map<string, number>();
+  private clock = realClock();
   private netEvents: SimEvent[] = [];
   private snapAcc = 0;
   private infoAt = -99;
@@ -36,37 +81,27 @@ export class HostSource extends LocalSource {
 
   private onMsg(from: string, msg: NetMsg) {
     if (msg.t === 'in' && Array.isArray(msg.d)) {
-      const q = this.queues.get(from) ?? [];
+      let q = this.queues.get(from);
+      if (!q) { q = new InputQueue(); this.queues.set(from, q); }
       q.push(decodeInput(msg.d));
-      if (q.length > 30) q.splice(0, q.length - 30);
-      this.queues.set(from, q);
     } else if (msg.t === 'ping') this.room.send({ t: 'pong', c: msg.c }, from);
   }
 
-  /** Ввод друзей на этот тик: движение — последнее, выстрелы — не теряем ни одного. */
+  /** Ввод друзей на этот тик: по одному из очереди, без потерь и без лишних шагов. */
   private collectRemote() {
     this.remoteInputs.clear();
     for (const [owner, q] of this.queues) {
       const f = this.match.fighterOf(owner);
       if (!f) continue;
-      if (!q.length) continue;
-      const last = q[q.length - 1];
-      const merged: FighterInput = { ...last, attack: 0, superAttack: 0, emote: -1 };
-      for (const i of q) {
-        if (i.superAttack && !merged.superAttack) { merged.superAttack = i.superAttack; merged.aim = i.aim; }
-        else if (i.attack && !merged.attack && !merged.superAttack) { merged.attack = i.attack; merged.aim = i.aim; }
-        if (i.emote >= 0) merged.emote = i.emote;
-      }
-      this.acks.set(owner, last.seq);
-      q.length = 0;
-      // держим последнее движение, пока не придёт новый ввод
-      q.push({ ...last, attack: 0, superAttack: 0, emote: -1 });
-      this.remoteInputs.set(f.id, merged);
+      const inp = q.next();
+      if (!inp) continue;
+      this.acks.set(owner, inp.seq);
+      this.remoteInputs.set(f.id, inp);
     }
   }
 
   update(dt: number, sample: () => FighterInput): SimEvent[] {
-    const ev = super.update(dt, sample);
+    const ev = super.update(this.clock(dt), sample);
     this.netEvents.push(...ev);
     if (this.netEvents.length > 300) this.netEvents.splice(0, this.netEvents.length - 300);
     return ev;
@@ -91,7 +126,7 @@ export class HostSource extends LocalSource {
     const withInfo = w.time - this.infoAt > 2;
     if (withInfo) this.infoAt = w.time;
     for (const id of this.room.clientIds) {
-      const s = makeSnapshot(w, this.acks.get(id) ?? 0, hud, this.netEvents, this.localTeam, withInfo);
+      const s = makeSnapshot(w, this.acks.get(id) ?? 0, hud, this.netEvents, this.localTeam, withInfo, this.match.rules.frozen(this.match));
       this.room.send({ t: 'snap', s }, id);
     }
     this.netEvents = [];
@@ -107,7 +142,8 @@ export class HostSource extends LocalSource {
 
 interface Info { heroId: string; skinId: string; name: string; level: number; team: number; owner: string; isBot: boolean; dummy: string }
 
-const INTERP = 0.11;
+/** Задержка показа чужих бойцов: столько секунд снимков держим про запас (подстраивается под Wi‑Fi). */
+const INTERP_MIN = 0.09, INTERP_MAX = 0.35;
 
 /** Клиент: копия мира по снимкам хоста. */
 export class ClientSource implements BattleSource {
@@ -119,6 +155,10 @@ export class ClientSource implements BattleSource {
   private buf: Snapshot[] = [];
   private offset: number | null = null;
   private renderTime = 0;
+  private delay = 0.12;
+  private jitter = 0.02;
+  private lastArrive = 0;
+  private clock = realClock();
   private infos = new Map<number, Info>();
   private queue: { tm: number; e: SimEvent }[] = [];
   private pending: FighterInput[] = [];
@@ -164,7 +204,10 @@ export class ClientSource implements BattleSource {
     // оценка разницы часов: самый быстрый пакет — лучшая оценка, плюс медленный дрейф
     const sample = st - now;
     if (this.offset === null || sample > this.offset) this.offset = sample;
-    else this.offset += (sample - this.offset) * 0.02;
+    else this.offset += (sample - this.offset) * (this.offset - sample > 0.15 ? 0.2 : 0.02);
+    // насколько неровно приходят снимки (Wi‑Fi любит пачки)
+    if (this.lastArrive) this.jitter += (Math.abs(now - this.lastArrive - SNAP_EVERY) - this.jitter) * 0.1;
+    this.lastArrive = now;
     if (s.fi) for (const a of s.fi) this.infos.set(a[0] as number, { heroId: a[1] as string, skinId: a[2] as string, name: a[3] as string, level: a[4] as number, team: a[5] as number, owner: a[6] as string, isBot: !!a[7], dummy: a[8] as string });
     if (!this.localId) {
       for (const [id, inf] of this.infos) if (inf.owner === this.room.myId) { this.localId = id; this.localTeam = inf.team; }
@@ -208,7 +251,7 @@ export class ClientSource implements BattleSource {
 
   update(dt: number, sample: () => FighterInput): SimEvent[] {
     const step = 1 / SIM_HZ;
-    this.acc += Math.min(dt, 0.25);
+    this.acc += this.clock(dt);
     while (this.acc >= step) {
       this.acc -= step;
       const inp = sample();
@@ -218,7 +261,14 @@ export class ClientSource implements BattleSource {
     const k = Math.exp(-dt * 10);
     this.smooth.x *= k; this.smooth.y *= k;
     if (performance.now() - this.pingAt > 2000) { this.pingAt = performance.now(); this.room.send({ t: 'ping', c: performance.now() }); }
-    if (this.offset !== null) this.renderTime = performance.now() / 1000 + this.offset - INTERP;
+    const want = Math.max(INTERP_MIN, Math.min(INTERP_MAX, SNAP_EVERY + 0.03 + this.jitter * 2.5));
+    this.delay += (want - this.delay) * Math.min(1, dt * (want > this.delay ? 4 : 0.5));
+    if (this.offset !== null && this.buf.length) {
+      // время показа идёт только вперёд и не убегает дальше свежего снимка
+      const latest = this.buf[this.buf.length - 1].tm / 1000;
+      const rt = Math.min(performance.now() / 1000 + this.offset - this.delay, latest + 0.1);
+      this.renderTime = Math.max(this.renderTime, rt);
+    }
     this.applyInterpolation();
     const out: SimEvent[] = [];
     while (this.queue.length && this.queue[0].tm <= this.renderTime + 0.02) out.push(this.queue.shift()!.e);
@@ -255,7 +305,8 @@ export class ClientSource implements BattleSource {
       const d0 = prev0.has(id) ? decodeFighter(prev0.get(id)!) : d1;
       const isMe = id === this.localId;
       const dl = isMe ? decodeFighter(latest.f.find((x) => x[0] === id) ?? raw) : d1;
-      if (isMe && this.predOn && dl.alive) {
+      // своё движение предсказываем; прыжок, рывок и оглушение показываем плавно по снимкам
+      if (isMe && this.predOn && dl.alive && !dl.forced) {
         f.x = this.pred.x + this.smooth.x; f.y = this.pred.y + this.smooth.y;
       } else {
         const jump = Math.hypot(d1.x - d0.x, d1.y - d0.y) > 3;
@@ -334,7 +385,7 @@ export class ClientSource implements BattleSource {
       isBot: inf.isBot, owner: inf.owner, dummy: (inf.dummy || undefined) as any, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, facing: 0, moving: false,
       radius: BATTLE.fighterRadius, speed: 0, hp: 1, maxHp: 1, baseHp: 1, dmgMul: 1, ammo: 3, attackReadyAt: 0, superCharge: 0,
       alive: true, deadAt: 0, respawnAt: 0, lastHurt: -99, lastShot: -99, revealUntil: 0, inBush: false, gems: 0, cubes: 0,
-      dash: null, knock: null, emote: -1, emoteUntil: 0, shotAt: -99, superAt: -99, hurtAt: -99, spawnX: 0, spawnY: 0,
+      dash: null, knock: null, leap: null, stunUntil: 0, emote: -1, emoteUntil: 0, shotAt: -99, superAt: -99, hurtAt: -99, spawnX: 0, spawnY: 0,
       stats: { damage: 0, kills: 0, deaths: 0, gems: 0, supers: 0, hits: 0, cubes: 0 },
     };
   }

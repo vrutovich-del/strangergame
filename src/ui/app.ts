@@ -7,8 +7,10 @@ import { randomSeed } from '../core/rng';
 import { playableHeroes } from '../heroes/registry';
 import { skinsOf } from '../heroes/skins';
 import type { ModeId } from '../maps/types';
-import { applyBattle, difficultyFor, ensureDaily, heroProgress, ownsSkin, starterGift, type BattleRewards } from '../meta/progress';
+import { applyBattle, difficultyFor, ensureDaily, heroProgress, ownsHero, ownsSkin, progressScore, starterGift, type BattleRewards } from '../meta/progress';
+import { migrate } from '../meta/save';
 import { store } from '../meta/store';
+import { cloud } from '../net/cloud';
 import { buildLineup, type HumanEntry } from '../modes/lineup';
 import { prewarm } from '../render/models';
 import { GameRenderer } from '../render/renderer';
@@ -61,6 +63,8 @@ export class App implements Nav {
     const pause = () => new Promise((res) => setTimeout(res, 30));
     progress(0.05);
     this.r = new GameRenderer(document.getElementById('game') as HTMLCanvasElement);
+    // аккаунт: сверяемся с облаком, пока грузятся модели (вдруг играли на другом устройстве)
+    const sync = this.startCloud();
     const s = store.data;
     audio.sfxVolume = s.settings.sfx; audio.musicVolume = s.settings.music; audio.vibration = s.settings.vibration;
     this.r.setQuality(s.settings.quality);
@@ -80,9 +84,10 @@ export class App implements Nav {
       await pause();
     }
     for (const hd of playableHeroes()) this.portrait(hd.id, heroProgress(s, hd.id).skin);
+    await Promise.race([sync, new Promise((res) => setTimeout(res, 4000))]);
     progress(1);
     clearInterval(tipTimer);
-    ensureDaily(s);
+    ensureDaily(store.data);
     store.commit();
     this.ui.appendChild(this.layer);
     this.ui.appendChild(h('div.rotate', h('div.phone'), 'Поверни телефон боком!'));
@@ -90,6 +95,21 @@ export class App implements Nav {
     startLoop((dt, now) => this.frame(dt, now));
     setTimeout(() => { this.bootEl.classList.add('hide'); setTimeout(() => this.bootEl.remove(), 500); }, 150);
     this.afterBoot();
+  }
+
+  /** Облачное сохранение: сверка при запуске, отправка после изменений и перед закрытием игры. */
+  private startCloud() {
+    store.subscribe(() => cloud.schedulePush());
+    const flush = () => cloud.flush();
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+    window.addEventListener('online', () => { if (cloud.status === 'error') cloud.schedulePush(500); });
+    const score = (data: string) => { try { return progressScore(migrate(JSON.parse(data))); } catch { return -1; } };
+    return cloud.attach(() => store.data, (data) => {
+      store.replace(migrate(JSON.parse(data)));
+      // если сверка закончилась уже в меню — перерисуем его
+      if (this.currentName === 'lobby') this.toLobby();
+    }, score);
   }
 
   private installUnlock() {
@@ -165,6 +185,9 @@ export class App implements Nav {
 
   back() { this.toLobby(); }
 
+  /** Какой экран сейчас открыт. */
+  get screenName() { return this.currentName; }
+
   refresh() {
     if (this.currentName === 'lobby') this.toLobby();
   }
@@ -172,7 +195,7 @@ export class App implements Nav {
   // ───────────── бой ─────────────
   selectedLoadout() {
     const s = store.data;
-    const heroId = s.selectedHero;
+    const heroId = ownsHero(s, s.selectedHero) ? s.selectedHero : 'smile';
     const hp = heroProgress(s, heroId);
     const skinId = ownsSkin(s, heroId, hp.skin) ? hp.skin : 'default';
     return { heroId, skinId, level: hp.level };

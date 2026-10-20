@@ -4,7 +4,7 @@ import type { ModeHud } from '../modes/types';
 import type { FighterInput, MatchConfig, MatchResult, SimEvent } from '../sim/types';
 import type { World } from '../sim/world';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export interface RoomPlayer {
   id: string;
@@ -36,7 +36,7 @@ export type NetMsg = LobbyMsg | GameMsg;
 
 // ───────────── ввод ─────────────
 export function encodeInput(i: FighterInput): number[] {
-  return [i.seq, Math.round(i.mx * 100), Math.round(i.my * 100), Math.round(i.aim * 1000), i.attack, i.superAttack, i.emote];
+  return [i.seq, Math.round(i.mx * 100), Math.round(i.my * 100), Math.round(i.aim * 1000), i.attack, i.superAttack, i.emote, Math.round((i.power ?? 1) * 100)];
 }
 export function decodeInput(d: number[]): FighterInput {
   const c = (v: number) => Math.max(-1, Math.min(1, (v | 0) / 100));
@@ -44,6 +44,7 @@ export function decodeInput(d: number[]): FighterInput {
     seq: d[0] | 0, mx: c(d[1]), my: c(d[2]), aim: (d[3] | 0) / 1000,
     attack: (d[4] === 1 || d[4] === 2 ? d[4] : 0) as 0 | 1 | 2, superAttack: (d[5] === 1 || d[5] === 2 ? d[5] : 0) as 0 | 1 | 2,
     emote: Number.isInteger(d[6]) && d[6] >= -1 && d[6] < 32 ? d[6] : -1,
+    power: d[7] === undefined ? 1 : Math.max(0, Math.min(1, (d[7] | 0) / 100)),
   };
 }
 
@@ -77,12 +78,13 @@ export interface Snapshot {
 const r2 = (v: number) => Math.round(v * 100);
 const ms = (age: number) => Math.max(0, Math.min(600000, Math.round(age * 1000)));
 
-/** Снять снимок мира для клиента. viewTeam — команда игроков (для видимости в кустах). */
-export function makeSnapshot(w: World, ack: number, hud: ModeHud, events: SimEvent[], viewTeam: number, withInfo: boolean): Snapshot {
+/** Снять снимок мира для клиента. viewTeam — команда игроков (для видимости в кустах).
+ *  frozen — бой стоит (отсчёт, пауза между раундами): клиент не предсказывает своё движение. */
+export function makeSnapshot(w: World, ack: number, hud: ModeHud, events: SimEvent[], viewTeam: number, withInfo: boolean, frozen = false): Snapshot {
   const t = w.time;
   const f = w.fighters.map((x) => [
     x.id, r2(x.x), r2(x.y), Math.round(x.facing * 1000), Math.round(x.hp), Math.round(x.maxHp), r2(x.ammo), r2(x.superCharge),
-    (x.alive ? F_ALIVE : 0) | (x.moving ? F_MOVING : 0) | (x.inBush ? F_BUSH : 0) | (x.alive && !w.isVisibleTo(x, viewTeam) ? F_HIDDEN : 0) | (x.dash || x.knock ? F_DASH : 0),
+    (x.alive ? F_ALIVE : 0) | (x.moving ? F_MOVING : 0) | (x.inBush ? F_BUSH : 0) | (x.alive && !w.isVisibleTo(x, viewTeam) ? F_HIDDEN : 0) | (x.dash || x.knock || x.leap || t < x.stunUntil || frozen ? F_DASH : 0),
     x.gems, x.cubes, ms(Math.max(0, x.infectedUntil - t)), x.infectTeam, x.emote, ms(Math.max(0, x.emoteUntil - t)),
     ms(t - x.shotAt), ms(t - x.superAt), ms(t - x.hurtAt), ms(t - x.deadAt), ms(Math.max(0, x.respawnAt - t)),
   ]);

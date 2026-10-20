@@ -146,7 +146,7 @@ export class Room extends Emitter<RoomEvents> {
         if (msg.v !== PROTOCOL_VERSION) { c.send({ t: 'old' }); setTimeout(() => c.close(), 300); return; }
         if (this.players.length >= MAX_PLAYERS || this.inGame) { c.send({ t: 'full' }); setTimeout(() => c.close(), 300); return; }
         this.conns.set(c.peer, c);
-        this.players.push({ id: c.peer, nick: String(msg.nick).slice(0, 14), hero: msg.hero, skin: msg.skin, level: Math.max(1, Math.min(9, msg.level | 0)), ready: false, host: false });
+        this.players.push({ id: c.peer, nick: String(msg.nick).slice(0, 14), hero: msg.hero, skin: msg.skin, level: Math.max(1, Math.min(9, msg.level | 0)), ready: true, host: false });
         this.broadcastRoster();
         return;
       }
@@ -211,7 +211,6 @@ export class Room extends Emitter<RoomEvents> {
 
   backToLobby() {
     this.inGame = false;
-    for (const p of this.players) if (!p.host) p.ready = false;
     if (this.role === 'host') this.broadcastRoster();
   }
 

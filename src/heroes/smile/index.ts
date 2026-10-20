@@ -11,6 +11,7 @@ const smile: HeroDef = {
   playable: true,
   order: 1,
   color: '#ffd23f',
+  rarity: 'common',
   stats: {
     hp: SMILE.hp, speed: SMILE.speed, reload: SMILE.reload, superPerHit: SMILE.superPerHit,
     attackCooldown: SMILE.attackCooldown, damage: SMILE.bullet.damage, superDamage: SMILE.super.damage,

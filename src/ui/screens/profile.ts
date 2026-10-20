@@ -3,12 +3,13 @@ import { sfx } from '../../audio/sfx';
 import { getHero, playableHeroes } from '../../heroes/registry';
 import { MODE_INFO } from '../../modes';
 import { AVATARS } from '../../meta/economy';
-import { totalTrophies } from '../../meta/progress';
+import { ownsHero, totalTrophies } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
 import { topBar } from '../common';
 import { btn, h, toast } from '../dom';
 import type { Screen } from './index';
+import { accountBox } from './account';
 import { cleanNick } from './firstRun';
 
 export function profileScreen(app: App): Screen {
@@ -20,7 +21,7 @@ export function profileScreen(app: App): Screen {
     s.nick = n; store.commit(); sfx('buy'); toast('Ник сохранён!', 'good'); app.open('profile');
   }, 'btn-green', { class: 'btn-sm' });
   const avatars = h('div.avatar-grid',
-    ...[...AVATARS, ...playableHeroes().map((d) => 'hero:' + d.id)].map((a) => h('div.avatar-pick' + (s.avatar === a ? '.on' : ''), {
+    ...[...AVATARS, ...playableHeroes().filter((d) => ownsHero(s, d.id)).map((d) => 'hero:' + d.id)].map((a) => h('div.avatar-pick' + (s.avatar === a ? '.on' : ''), {
       onclick: () => { s.avatar = a; store.commit(); sfx('tab'); app.open('profile'); },
     }, a.startsWith('hero:') ? h('img', { src: app.portrait(a.slice(5)) }) : a)),
   );
@@ -32,6 +33,8 @@ export function profileScreen(app: App): Screen {
         h('div.avatar.big', s.avatar.startsWith('hero:') ? h('img', { src: app.portrait(s.avatar.slice(5)) }) : s.avatar),
         h('div.col', h('div.row', input, save), h('div.small', 'Не пиши настоящее имя и фамилию — придумай прозвище!')),
       ),
+      h('div.sec-title.t', '☁️ Аккаунт'),
+      accountBox(app),
       h('div.sec-title.t', 'Аватар'),
       avatars,
       h('div.sec-title.t', 'Статистика'),

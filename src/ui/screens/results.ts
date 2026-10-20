@@ -9,6 +9,7 @@ import type { MatchResult } from '../../sim/types';
 import type { BattleSource } from '../battle';
 import type { App } from '../app';
 import { btn, countUp, h } from '../dom';
+import { dropOverlay } from './drop';
 import type { Screen } from './index';
 
 export function resultsScreen(app: App, res: MatchResult, src: BattleSource, r: BattleRewards | null, next: () => void): Screen {
@@ -52,13 +53,16 @@ export function resultsScreen(app: App, res: MatchResult, src: BattleSource, r: 
     star.id === me?.id ? h('div.rs-bonus.t', `+${ECONOMY.starPlayerCoins} 🪙`) : null,
   ) : null;
   const myStats = me ? h('div.res-mystats', `Урон: ${Math.round(me.stats.damage)} · Выбито: ${me.stats.kills}` + (res.mode === 'gemgrab' ? ` · Кристаллов собрано: ${me.stats.gems}` : '') + (res.mode === 'showdown' ? ` · Кубов: ${me.stats.cubes}` : '')) : null;
+  if (r?.drop) rows.append(h('div.rr.highlight.drop-row.t', '⭐ Старр-дроп за победу!'));
+  // сначала открываем Старр-дропы, потом — дальше
+  const goOn = () => (store.data.drops.length ? dropOverlay(app, next) : next());
   const el = h('div.screen.results',
     h('div.res-left',
       h('div.res-mode.t', MODE_INFO[res.mode].icon + ' ' + MODE_INFO[res.mode].name),
       h('div.res-title.t.' + cls, title),
       myStats,
       rows, trophyLine,
-      btn('ДАЛЬШЕ', next, 'btn-yellow', { class: 'btn-play' }),
+      btn(r?.drop ? 'ОТКРЫТЬ ДРОП ⭐' : 'ДАЛЬШЕ', goOn, 'btn-yellow', { class: 'btn-play' }),
     ),
     starEl,
   );

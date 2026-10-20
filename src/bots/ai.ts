@@ -133,6 +133,7 @@ export class BotBrain {
           if (ok) {
             inp.superAttack = 1; inp.attack = 0;
             inp.aim = this.aimAt(w, target, 12);
+            inp.power = Math.min(1, d / Math.max(1, sRange));
             this.superSeenAt = -1;
           }
         }

@@ -15,7 +15,11 @@ export function h(sel: string, props?: Props | Child, ...children: Child[]): HTM
   if (props) {
     for (const [k, v] of Object.entries(props as Props)) {
       if (v === undefined || v === null || v === false) continue;
-      if (k === 'style') { if (typeof v === 'string') el.setAttribute('style', v); else Object.assign(el.style, v); }
+      if (k === 'style') {
+        if (typeof v === 'string') el.setAttribute('style', v);
+        // CSS-переменные (--hc, --box …) задаются только через setProperty
+        else for (const [sk, sv] of Object.entries(v)) { if (sk.startsWith('--')) el.style.setProperty(sk, String(sv)); else (el.style as any)[sk] = sv; }
+      }
       else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v as EventListener);
       else if (k === 'class') el.className += ' ' + v;
       else if (k === 'html') el.innerHTML = v;

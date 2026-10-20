@@ -1,9 +1,11 @@
 // Сохранение на устройстве (localStorage) с номером версии схемы и миграциями.
 // Экспорт/импорт — коротким кодом, чтобы перенести прогресс на другое устройство.
 import type { ModeId } from '../maps/types';
-import { ECONOMY } from './economy';
+import { ECONOMY, type DropRarity } from './economy';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+/** Герой, который есть у каждого с самого начала. */
+export const STARTER_HERO = 'smile';
 export const SAVE_KEY = 'igra-strannostey-save';
 
 export interface HeroProgress {
@@ -46,6 +48,12 @@ export interface SaveData {
   gems: number;
   bling: number;
   heroes: Record<string, HeroProgress>;
+  /** Открытые герои. В начале — только Смайл, остальные из Старр-дропов, ящиков и Дороги трофеев. */
+  owned: string[];
+  /** Неоткрытые Старр-дропы (за победы). */
+  drops: DropRarity[];
+  /** Когда сохранение менялось в последний раз (для облака). */
+  savedAt: number;
   /** Купленные скины: «герой:скин». */
   skins: string[];
   emotes: number[];
@@ -78,8 +86,10 @@ export function defaultSave(): SaveData {
     bling: ECONOMY.start.bling,
     heroes: {
       smile: { level: 1, trophies: 0, best: 0, skin: 'default', played: 0, wins: 0 },
-      bacteria: { level: 1, trophies: 0, best: 0, skin: 'default', played: 0, wins: 0 },
     },
+    owned: [STARTER_HERO],
+    drops: [],
+    savedAt: 0,
     skins: [],
     emotes: [0, 1, 2, 3],
     bestTrophies: 0,
@@ -109,6 +119,16 @@ export const MIGRATIONS: Record<number, (d: any) => any> = {
   },
   // v1 → v2: появились неоткрытые ящики и настройка сложности роботов
   1: (d) => ({ ...d, v: 2, boxes: d.boxes ?? [], settings: { ...d.settings, difficulty: d.settings?.difficulty ?? 'auto' } }),
+  // v2 → v3: герои открываются по одному. Кто уже играл другими героями или купил им скины — они остаются.
+  2: (d) => {
+    const owned = new Set<string>([STARTER_HERO]);
+    for (const [id, h] of Object.entries((d.heroes ?? {}) as Record<string, Partial<HeroProgress>>)) {
+      if (h && ((h.played ?? 0) > 0 || (h.trophies ?? 0) > 0 || (h.level ?? 1) > 1)) owned.add(id);
+    }
+    for (const k of (Array.isArray(d.skins) ? d.skins : []) as string[]) owned.add(String(k).split(':')[0]);
+    const selectedHero = owned.has(d.selectedHero) ? d.selectedHero : STARTER_HERO;
+    return { ...d, v: 3, owned: [...owned], drops: [], savedAt: d.savedAt ?? 0, selectedHero };
+  },
 };
 
 /** Привести любые сохранённые данные к текущей схеме. */
@@ -135,6 +155,10 @@ export function migrate(raw: any): SaveData {
   merged.road = { ...def.road, ...(d.road ?? {}) };
   merged.quests = { ...def.quests, ...(d.quests ?? {}) };
   if (!Array.isArray(merged.emotes) || !merged.emotes.length) merged.emotes = def.emotes;
+  if (!Array.isArray(merged.owned)) merged.owned = [...def.owned];
+  if (!merged.owned.includes(STARTER_HERO)) merged.owned.unshift(STARTER_HERO);
+  if (!Array.isArray(merged.drops)) merged.drops = [];
+  if (!merged.owned.includes(merged.selectedHero)) merged.selectedHero = STARTER_HERO;
   return merged;
 }
 

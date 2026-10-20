@@ -163,6 +163,7 @@ export class BattleScreen {
           else if (e.heroId === 'bacteria') name = 'shoot_germ';
           else if (e.heroId === 'robo_sniper') name = 'laser';
           else if (e.heroId === 'robo_tank') name = e.sup ? 'dash' : 'punch';
+          else if (e.heroId === 'lion') name = e.sup ? 'roar' : 'claw';
           if (e.sup) sfx('super', { vol, pitch });
           sfx(name, { vol, pitch: e.sup && e.heroId === 'bacteria' ? pitch * 0.6 : pitch });
           if (e.id === this.src.localId && e.sup) audio.vibrate(40);
@@ -173,12 +174,16 @@ export class BattleScreen {
           break;
         case 'death': {
           const f = w.findById(e.id);
-          const n: SfxName = f?.heroId === 'smile' ? 'deflate' : f?.heroId === 'bacteria' ? 'splat' : 'death';
-          sfx(n, { vol: att(e.x, e.y) });
+          const n: SfxName = f?.heroId === 'smile' ? 'deflate' : f?.heroId === 'bacteria' ? 'splat' : f?.heroId === 'lion' ? 'roar' : 'death';
+          sfx(n, { vol: att(e.x, e.y), pitch: n === 'roar' ? 0.7 : 1 });
           if (e.id === this.src.localId) audio.vibrate([60, 40, 60]);
           break;
         }
         case 'tile': sfx('crate', { vol: att(e.tx, e.ty) }); break;
+        case 'impact':
+          if (e.kind === 'claw_hit') sfx('claw', { vol: att(e.x, e.y), pitch: 0.9 + Math.random() * 0.2 });
+          else if (e.kind === 'lion_slam') { sfx('slam', { vol: att(e.x, e.y) }); if (this.near(e.x, e.y)) audio.vibrate(50); }
+          break;
         case 'pickup': if (e.id === this.src.localId) sfx(e.kind === 'gem' ? 'gem' : 'cube'); else sfx(e.kind === 'gem' ? 'gem' : 'cube', { vol: att(e.x, e.y) * 0.5 }); break;
         case 'infect': sfx('infect', { vol: att(0, 0) }); break;
         case 'cure': sfx('sneeze', { vol: 0.8 }); break;
@@ -192,12 +197,23 @@ export class BattleScreen {
     }
   }
 
+  private near(x: number, y: number) {
+    const me = this.src.world.findById(this.src.localId);
+    return !!me && Math.hypot(me.x - x, me.y - y) < 2.5;
+  }
+
   /** Кадр. Возвращает false, когда экран можно закрывать. */
   frame(dt: number) {
     const src = this.src;
     this.input.pollGamepad();
     const events = src.update(dt, () => this.input.sample());
     const w = src.world;
+    // у друга в сетевой игре свой боец становится известен только с первым снимком от хоста
+    if (this.view.localId !== src.localId) {
+      this.view.localId = src.localId;
+      this.view.localTeam = src.localTeam;
+      this.view.snapCamera(w);
+    }
     this.view.localTeam = src.localTeam;
     this.view.onEvents(events, w);
     this.soundFor(events);

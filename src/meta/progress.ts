@@ -1,11 +1,12 @@
 // Логика мета-игры: награды за бой, прокачка, покупки, ящики, пропуск, задания, вход, дорога трофеев.
 // Все функции работают с данными сохранения и не знают об интерфейсе.
 import { Rng } from '../core/rng';
-import { getHero } from '../heroes/registry';
+import { RARITY, rarityRank, type Rarity } from '../heroes/rarity';
+import { getHero, hasHero, playableHeroes } from '../heroes/registry';
 import { allSkins, getSkin } from '../heroes/skins';
 import type { ModeId } from '../maps/types';
 import type { MatchResult } from '../sim/types';
-import { DAILY_DEALS, ECONOMY, passRewards, QUESTS, TROPHY_ROAD, type BoxKind, type Currency, type Reward } from './economy';
+import { DAILY_DEALS, ECONOMY, passRewards, QUESTS, TROPHY_ROAD, type BoxKind, type Currency, type DropRarity, type Reward } from './economy';
 import type { SaveData } from './save';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -14,6 +15,12 @@ const dayNum = (key: string) => { const [y, m, d] = key.split('-').map(Number); 
 
 export function totalTrophies(s: SaveData) {
   return Object.values(s.heroes).reduce((a, h) => a + h.trophies, 0);
+}
+
+/** «Сколько прогресса» в сохранении: чтобы при споре двух устройств оставить то, где его больше. */
+export function progressScore(s: SaveData) {
+  const games = Object.values(s.stats.games).reduce((a, n) => a + (n ?? 0), 0);
+  return s.bestTrophies * 1000 + totalTrophies(s) * 10 + games;
 }
 
 export function heroProgress(s: SaveData, heroId: string) {
@@ -30,6 +37,31 @@ export function spend(s: SaveData, c: Currency, amount: number) {
 }
 
 export const ownsSkin = (s: SaveData, heroId: string, skinId: string) => skinId === 'default' || s.skins.includes(`${heroId}:${skinId}`);
+
+// ───────────── герои ─────────────
+export const ownsHero = (s: SaveData, heroId: string) => s.owned.includes(heroId);
+export const heroRarity = (heroId: string): Rarity => getHero(heroId).rarity ?? 'common';
+
+/** Открыть героя (на 1 уровне, без трофеев). */
+export function unlockHero(s: SaveData, heroId: string) {
+  if (!ownsHero(s, heroId)) s.owned.push(heroId);
+  heroProgress(s, heroId);
+}
+
+/** Случайный ещё не открытый герой (редкие — реже). maxRarity — герой не реже этой редкости. */
+export function rollHero(s: SaveData, rng: Rng, maxRarity: Rarity = 'legendary'): string | null {
+  const pool = playableHeroes().filter((h) => !ownsHero(s, h.id) && rarityRank(h.rarity ?? 'common') <= rarityRank(maxRarity));
+  if (!pool.length) return null;
+  const weights = pool.map((h) => ECONOMY.heroes.weight[h.rarity ?? 'common']);
+  let x = rng.next() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < pool.length; i++) { x -= weights[i]; if (x < 0) return pool[i].id; }
+  return pool[pool.length - 1].id;
+}
+
+/** Скины, которые могут выпасть: только для открытых героев и только новые. */
+function skinPool(s: SaveData, currency?: 'gems') {
+  return allSkins().filter((k) => k.id !== 'default' && !k.exclusive && (!currency || k.currency === currency) && ownsHero(s, k.heroId) && !ownsSkin(s, k.heroId, k.id));
+}
 
 /** Выдать награду. Возвращает то, что реально выдано (скин-дубликат превращается в кристаллы). */
 export function grant(s: SaveData, r: Reward, rng = new Rng(Date.now() & 0xffffff)): Reward[] {
@@ -49,7 +81,16 @@ export function grant(s: SaveData, r: Reward, rng = new Rng(Date.now() & 0xfffff
       return [r];
     }
     case 'box': return openBox(s, r.box, rng);
-    case 'hero': return [r];
+    case 'hero': {
+      if (!hasHero(r.heroId)) return [];
+      if (ownsHero(s, r.heroId)) {
+        const g = { kind: 'gems' as const, amount: ECONOMY.heroes.duplicateGems[heroRarity(r.heroId)] };
+        s.gems += g.amount;
+        return [g];
+      }
+      unlockHero(s, r.heroId);
+      return [r];
+    }
   }
 }
 
@@ -105,8 +146,12 @@ export function openBox(s: SaveData, kind: BoxKind, rng: Rng): Reward[] {
   if (rng.chance(t.gems.chance)) out.push({ kind: 'gems', amount: rng.int(t.gems.min, t.gems.max) });
   if (rng.chance(t.bling.chance)) out.push({ kind: 'bling', amount: rng.int(t.bling.min, t.bling.max) });
   if (rng.chance(t.skin)) {
-    const pool = allSkins().filter((k) => k.id !== 'default' && !k.exclusive && k.currency === 'gems' && !ownsSkin(s, k.heroId, k.id));
+    const pool = skinPool(s, 'gems');
     if (pool.length) { const k = rng.pick(pool); out.push({ kind: 'skin', heroId: k.heroId, skinId: k.id }); }
+  }
+  if (rng.chance(t.hero)) {
+    const id = rollHero(s, rng);
+    if (id) out.push({ kind: 'hero', heroId: id });
   }
   const given: Reward[] = [];
   for (const r of out) given.push(...grant(s, r, rng));
@@ -128,7 +173,58 @@ export function boxOdds(kind: BoxKind): string[] {
     `Кристаллы: ${pc(t.gems.chance)} (${t.gems.min}–${t.gems.max})`,
     `Блинги: ${pc(t.bling.chance)} (${t.bling.min}–${t.bling.max})`,
     `Скин: ${pc(t.skin)}`,
+    `Новый герой: ${pc(t.hero)}`,
   ];
+}
+
+// ───────────── Старр-дропы ─────────────
+export const DROP_STEPS: DropRarity[] = ['rare', 'superrare', 'epic', 'mythic', 'legendary'];
+
+/** Какой редкости будет дроп за победу. */
+export function rollDropRarity(rng: Rng): DropRarity {
+  const odds = ECONOMY.starrDrop.odds;
+  let x = rng.next();
+  for (const r of DROP_STEPS) { x -= odds[r]; if (x < 0) return r; }
+  return 'rare';
+}
+
+/** Открыть Старр-дроп: одна награда по таблице его редкости.
+ *  item — что выпало (ящик, герой, …), given — что реально выдано (содержимое ящика, кристаллы за повтор). */
+export function openStarrDrop(s: SaveData, rarity: DropRarity, rng: Rng): { item: Reward; given: Reward[] } {
+  const table = ECONOMY.starrDrop.loot[rarity];
+  let x = rng.next() * table.reduce((a, l) => a + l.w, 0);
+  let row = table[table.length - 1];
+  for (const l of table) { x -= l.w; if (x < 0) { row = l; break; } }
+  let r: Reward | null = null;
+  switch (row.kind) {
+    case 'coins': case 'gems': case 'bling': r = { kind: row.kind, amount: rng.int(row.min, row.max) }; break;
+    case 'box': r = { kind: 'box', box: row.box }; break;
+    case 'skin': {
+      const pool = skinPool(s);
+      if (pool.length) { const k = rng.pick(pool); r = { kind: 'skin', heroId: k.heroId, skinId: k.id }; }
+      break;
+    }
+    case 'hero': {
+      const id = rollHero(s, rng, rarity);
+      if (id) r = { kind: 'hero', heroId: id };
+      break;
+    }
+  }
+  if (!r) r = { kind: 'gems', amount: ECONOMY.starrDrop.fallbackGems[rarity] };
+  return { item: r, given: grant(s, r, rng) };
+}
+
+/** Открыть первый из ждущих Старр-дропов. */
+export function openNextDrop(s: SaveData, rng = new Rng(Date.now() & 0xffffff)) {
+  const rarity = s.drops.shift();
+  if (!rarity) return null;
+  return { rarity, ...openStarrDrop(s, rarity, rng) };
+}
+
+/** Шансы Старр-дропа для кнопки «i». */
+export function dropOdds(): string[] {
+  const pc = (x: number) => `${Math.round(x * 1000) / 10}%`;
+  return DROP_STEPS.map((r) => `${RARITY[r].name}: ${pc(ECONOMY.starrDrop.odds[r])}`);
 }
 
 // ───────────── боевой пропуск ─────────────
@@ -176,7 +272,7 @@ export function ensureDaily(s: SaveData, now = new Date()) {
   if (s.quests.day !== today) {
     const rng = new Rng(dayNum(today) * 7919 + s.createdAt % 1000);
     const pool = rng.shuffle(QUESTS.slice()).slice(0, 3);
-    const heroes = Object.keys(s.heroes);
+    const heroes = s.owned.filter((id) => hasHero(id));
     s.quests = {
       day: today,
       list: pool.map((q) => ({ id: q.id, hero: q.hero ? rng.pick(heroes) : '', target: rng.pick(q.amounts), progress: 0, claimed: false })),
@@ -206,7 +302,7 @@ export function dailyDeal(now = new Date()) {
 
 export function questText(q: { id: string; hero: string; target: number }) {
   const t = QUESTS.find((x) => x.id === q.id)!;
-  const heroName = q.hero ? { smile: 'Смайлом', bacteria: 'Бактерией' }[q.hero] ?? getHero(q.hero).name : '';
+  const heroName = q.hero ? ({ smile: 'Смайлом', bacteria: 'Бактерией', lion: 'Львом' } as Record<string, string>)[q.hero] ?? (hasHero(q.hero) ? getHero(q.hero).name : q.hero) : '';
   return t.text(q.target, heroName);
 }
 
@@ -245,10 +341,19 @@ export interface BattleRewards {
   tierBefore: number;
   tierAfter: number;
   trophiesBefore: number;
+  /** Старр-дроп за победу (уже лежит в s.drops), или null. */
+  drop: DropRarity | null;
+}
+
+/** Заслужен ли Старр-дроп: победа в командном режиме, 1–3 место в одиночном Выживании, 1 место командой. */
+export function earnsDrop(c: BattleContext, won: boolean | null, place: number) {
+  if (c.mode === 'training' || c.result.reason !== 'normal') return false;
+  if (c.mode === 'showdown') return c.teamShowdown ? place === 1 : place >= 1 && place <= 3;
+  return won === true;
 }
 
 /** Посчитать награды за бой (без изменения сохранения). */
-export function computeRewards(s: SaveData, c: BattleContext): Omit<BattleRewards, 'questsDone' | 'tierBefore' | 'tierAfter' | 'trophiesBefore'> {
+export function computeRewards(s: SaveData, c: BattleContext): Omit<BattleRewards, 'questsDone' | 'tierBefore' | 'tierAfter' | 'trophiesBefore' | 'drop'> {
   const E = ECONOMY;
   const hero = heroProgress(s, c.heroId);
   const r = c.result;
@@ -280,7 +385,7 @@ export function computeRewards(s: SaveData, c: BattleContext): Omit<BattleReward
 }
 
 /** Начислить награды и прогресс заданий. */
-export function applyBattle(s: SaveData, c: BattleContext): BattleRewards {
+export function applyBattle(s: SaveData, c: BattleContext, rng = new Rng(Date.now() & 0xffffff)): BattleRewards {
   ensureDaily(s, c.now ?? new Date());
   const base = computeRewards(s, c);
   const hero = heroProgress(s, c.heroId);
@@ -321,7 +426,9 @@ export function applyBattle(s: SaveData, c: BattleContext): BattleRewards {
       if (before < q.target && q.progress >= q.target) questsDone.push(i);
     });
   }
-  return { ...base, questsDone, tierBefore, tierAfter: passTier(s.pass.xp), trophiesBefore };
+  const drop = earnsDrop(c, base.won, base.place) ? rollDropRarity(rng) : null;
+  if (drop) s.drops.push(drop);
+  return { ...base, questsDone, tierBefore, tierAfter: passTier(s.pass.xp), trophiesBefore, drop };
 }
 
 /** Сложность роботов: из настроек или по трофеям героя. */
@@ -344,7 +451,7 @@ export function notifications(s: SaveData, now = new Date()) {
     pass,
     quests: s.quests.list.some((q) => !q.claimed && q.progress >= q.target) || loginAvailable(s, now),
     shop: !s.shop.gift,
-    heroes: Object.entries(s.heroes).some(([, h]) => { const c = upgradeCost(h.level); return c !== null && s.coins >= c; }),
+    heroes: Object.entries(s.heroes).some(([id, h]) => { const c = upgradeCost(h.level); return ownsHero(s, id) && c !== null && s.coins >= c; }),
     boxes: s.boxes.length > 0,
   };
 }
@@ -358,7 +465,7 @@ export function rewardLabel(r: Reward | { kind: 'future'; text: string }): { ico
     case 'box': return { icon: '📦', text: ECONOMY.boxes[r.box].name };
     case 'skin': return { icon: '👕', text: getSkin(r.heroId, r.skinId).name };
     case 'emote': return { icon: '😀', text: 'Эмоция' };
-    case 'hero': return { icon: '🦸', text: 'Новый герой' };
+    case 'hero': return { icon: '🦸', text: hasHero(r.heroId) ? getHero(r.heroId).name : 'Новый герой' };
     case 'future': return { icon: '❓', text: r.text };
   }
 }

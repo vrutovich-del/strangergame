@@ -4,7 +4,7 @@ import { playableHeroes } from '../../heroes/registry';
 import { skinsOf } from '../../heroes/skins';
 import { EMOTE_LIST } from '../../render/battleView';
 import { ECONOMY, type BoxKind } from '../../meta/economy';
-import { boxOdds, buyEmote, buySkin, canAfford, dailyDeal, grant, ownsSkin, spend } from '../../meta/progress';
+import { boxOdds, buyEmote, buySkin, canAfford, dailyDeal, grant, ownsHero, ownsSkin, spend } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
 import { rewardCard, topBar } from '../common';
@@ -40,13 +40,16 @@ export function shopScreen(app: App, section?: string): Screen {
 
   // скины
   const skins = playableHeroes().flatMap((hd) => skinsOf(hd.id).filter((k) => k.id !== 'default' && !k.exclusive));
+  // сначала скины открытых героев
+  skins.sort((a, b) => Number(ownsHero(s, b.heroId)) - Number(ownsHero(s, a.heroId)));
   const skinCards = skins.map((k) => {
     const owned = ownsSkin(s, k.heroId, k.id);
-    return h('div.offer.skin', { style: { '--sc': k.cardColor } as any },
+    const heroOpen = ownsHero(s, k.heroId);
+    return h('div.offer.skin' + (heroOpen ? '' : '.locked'), { style: { '--sc': k.cardColor } as any },
       h('img.offer-img', { src: app.portrait(k.heroId, k.id) }),
       h('div.offer-title.t', k.name),
       h('div.offer-desc', k.desc),
-      owned ? h('div.sold.t', 'Есть ✔') : priceBtn(k.currency, k.price, () => {
+      owned ? h('div.sold.t', 'Есть ✔') : !heroOpen ? h('div.sold.t', '🔒 Открой героя') : priceBtn(k.currency, k.price, () => {
         if (buySkin(s, k.heroId, k.id)) { s.heroes[k.heroId].skin = k.id; store.commit(); sfx('buy'); toast('Новый скин: ' + k.name + '!', 'good'); refresh(); }
       }),
     );
@@ -56,7 +59,7 @@ export function shopScreen(app: App, section?: string): Screen {
   const boxCard = (kind: BoxKind) => {
     const b = ECONOMY.boxes[kind];
     return h('div.offer.box', { style: { '--bc': b.color } as any },
-      btn('i', () => modal(h('div', h('h2', b.name), h('p', 'Что может выпасть:'), h('ul.odds', ...boxOdds(kind).map((x) => h('li', x))), h('p.small', 'Скин выпадает только тот, которого у тебя ещё нет.'))), 'btn-blue', { class: 'info-btn' }),
+      btn('i', () => modal(h('div', h('h2', b.name), h('p', 'Что может выпасть:'), h('ul.odds', ...boxOdds(kind).map((x) => h('li', x))), h('p.small', 'Скин и герой выпадают только новые. Редкие герои выпадают реже.'))), 'btn-blue', { class: 'info-btn' }),
       h('div.mini-box.' + kind, { style: { '--box': b.color } as any }, h('div.bb-lid'), h('div.bb-body', h('div.bb-emblem', '?'))),
       h('div.offer-title.t', b.name),
       priceBtn(b.price.currency, b.price.amount, () => {

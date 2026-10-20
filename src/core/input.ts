@@ -29,7 +29,7 @@ export class Input {
   private keys = new Set<string>();
   private touches = new Map<number, Stick>();
   private mouse = { x: 0, y: 0, l: false, r: false, lAt: 0, rAt: 0 };
-  private pending: { attack: 0 | 1 | 2; sup: 0 | 1 | 2; angle: number; emote: number } = { attack: 0, sup: 0, angle: 0, emote: -1 };
+  private pending: { attack: 0 | 1 | 2; sup: 0 | 1 | 2; angle: number; emote: number; power: number } = { attack: 0, sup: 0, angle: 0, emote: -1, power: 1 };
   /** Угол, который будет при выстреле с ручным прицелом. */
   aim: AimState | null = null;
   move = { x: 0, y: 0 };
@@ -92,7 +92,7 @@ export class Input {
       if (k === 'KeyT') this.onEmoteKey();
     }
     if (!down && k === 'KeyE' && this.aim?.kind === 'super') {
-      this.pending.sup = 1; this.pending.angle = this.mouseAngle(); this.aim = null;
+      this.pending.sup = 1; this.pending.angle = this.mouseAngle(); this.pending.power = this.mousePower(); this.aim = null;
     }
     if (down) this.keys.add(k); else this.keys.delete(k);
   }
@@ -117,7 +117,7 @@ export class Input {
       if (e.button === 2) { this.mouse.r = true; this.aim = { kind: 'super', angle: this.mouseAngle(), power: this.mousePower() }; }
     } else if (kind === 'up') {
       if (e.button === 0 && this.mouse.l) { this.mouse.l = false; this.pending.attack = 1; this.pending.angle = this.mouseAngle(); if (this.aim?.kind === 'attack') this.aim = null; }
-      if (e.button === 2 && this.mouse.r) { this.mouse.r = false; this.pending.sup = 1; this.pending.angle = this.mouseAngle(); if (this.aim?.kind === 'super') this.aim = null; }
+      if (e.button === 2 && this.mouse.r) { this.mouse.r = false; this.pending.sup = 1; this.pending.angle = this.mouseAngle(); this.pending.power = this.mousePower(); if (this.aim?.kind === 'super') this.aim = null; }
     } else if (this.aim && this.device === 'desktop') {
       this.aim.angle = this.mouseAngle(); this.aim.power = this.mousePower();
     }
@@ -161,7 +161,7 @@ export class Input {
           const quick = now - s.t0 < TAP_TIME && d < TAP_DIST;
           const which = s.kind === 'attack' ? 'attack' : 'sup';
           if (!s.aiming && (quick || d < TAP_DIST)) this.pending[which] = 2;
-          else if (s.aiming && d > CANCEL_DIST) { this.pending[which] = 1; this.pending.angle = Math.atan2(dy * 1.2, dx); }
+          else if (s.aiming && d > CANCEL_DIST) { this.pending[which] = 1; this.pending.angle = Math.atan2(dy * 1.2, dx); this.pending.power = Math.min(1, d / 90); }
           if (this.aim?.kind === s.kind) this.aim = null;
         }
       }
@@ -191,7 +191,7 @@ export class Input {
       this.gpPrev.superAim = lb;
     } else if (this.gpPrev.aiming) {
       this.gpPrev.aiming = false;
-      if (this.aim) { if (this.gpPrev.superAim) this.pending.sup = 1; else this.pending.attack = 1; this.pending.angle = this.aim.angle; }
+      if (this.aim) { if (this.gpPrev.superAim) this.pending.sup = 1; else this.pending.attack = 1; this.pending.angle = this.aim.angle; this.pending.power = this.aim.power; }
       this.aim = null;
     }
     if (rb && !this.gpPrev.rb && rLen <= 0.5) this.pending.attack = 2;
@@ -223,13 +223,14 @@ export class Input {
     }
     if (!this.enabled) { mx = 0; my = 0; }
     const p = this.pending;
-    const out: FighterInput = { mx, my, aim: p.angle, attack: p.attack, superAttack: p.sup, emote: p.emote, seq: ++this.seq };
+    const out: FighterInput = { mx, my, aim: p.angle, attack: p.attack, superAttack: p.sup, emote: p.emote, seq: ++this.seq, power: p.power };
+    if (p.sup) p.power = 1;
     p.attack = 0; p.sup = 0; p.emote = -1;
     return out;
   }
 
   clear() {
-    this.pending = { attack: 0, sup: 0, angle: 0, emote: -1 };
+    this.pending = { attack: 0, sup: 0, angle: 0, emote: -1, power: 1 };
     this.aim = null;
     this.touches.clear();
     this.sticks = { move: null, attack: null, super: null };

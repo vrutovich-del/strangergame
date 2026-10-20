@@ -1,6 +1,8 @@
 // Открытие ящика: ящик трясётся, по тапу взрывается, награды вылетают по одной.
 import { sfx } from '../../audio/sfx';
 import { Rng } from '../../core/rng';
+import { RARITY } from '../../heroes/rarity';
+import { getHero } from '../../heroes/registry';
 import { getSkin } from '../../heroes/skins';
 import { ECONOMY, type BoxKind, type Reward } from '../../meta/economy';
 import { openBox, rewardLabel } from '../../meta/progress';
@@ -9,6 +11,33 @@ import type { App } from '../app';
 import { rewardCard } from '../common';
 import { btn, h } from '../dom';
 import type { Screen } from './index';
+
+/** Значок редкости. */
+export function rarityBadge(r: keyof typeof RARITY) {
+  return h('span.rarity-badge.t', { style: { '--rc': RARITY[r].color } as any }, RARITY[r].name);
+}
+
+/** Большая карточка награды (из ящика, Старр-дропа, дороги трофеев). */
+export function rewardReveal(app: App, r: Reward): HTMLElement {
+  if (r.kind === 'hero') {
+    const d = getHero(r.heroId);
+    return h('div.box-reward.hero', { style: { '--rc': RARITY[d.rarity ?? 'common'].color } as any },
+      h('div.br-new.t', 'НОВЫЙ ГЕРОЙ!'),
+      h('img.br-img.hero-glow', { src: app.portrait(r.heroId) }),
+      h('div.br-name.t', d.name),
+      rarityBadge(d.rarity ?? 'common'),
+      h('div.br-role', d.role),
+    );
+  }
+  const l = rewardLabel(r);
+  const skin = r.kind === 'skin' ? getSkin(r.heroId, r.skinId) : null;
+  return h('div.box-reward.' + r.kind,
+    skin && r.kind === 'skin' ? h('img.br-img', { src: app.portrait(r.heroId, r.skinId) }) : h('div.br-icon', l.icon),
+    h('div.br-amount.t', skin ? 'Новый скин!' : (r.kind === 'coins' || r.kind === 'gems' || r.kind === 'bling') ? '+' + l.text : l.text),
+    h('div.br-name.t', skin ? skin.name : r.kind === 'coins' ? 'Монеты' : r.kind === 'gems' ? 'Кристаллы' : r.kind === 'bling' ? 'Блинги' : ''),
+    skin ? rarityBadge(skin.rarity) : null,
+  );
+}
 
 /** Показать открытие ящика поверх всего. given — уже выданные награды (если null — ящик откроется сейчас). */
 export function boxOverlay(app: App, kind: BoxKind, given: Reward[] | null, onDone: () => void, title?: string) {
@@ -37,17 +66,11 @@ export function boxOverlay(app: App, kind: BoxKind, given: Reward[] | null, onDo
       return;
     }
     const r = rewards[i++];
-    const l = rewardLabel(r);
-    const skin = r.kind === 'skin' ? getSkin(r.heroId, r.skinId) : null;
-    const card = h('div.box-reward.' + r.kind,
-      skin ? h('img.br-img', { src: app.portrait(r.kind === 'skin' ? r.heroId : '', r.kind === 'skin' ? r.skinId : '') }) : h('div.br-icon', l.icon),
-      h('div.br-amount.t', skin ? 'Новый скин!' : (r.kind === 'coins' || r.kind === 'gems' || r.kind === 'bling') ? '+' + l.text : l.text),
-      h('div.br-name.t', skin ? skin.name : r.kind === 'coins' ? 'Монеты' : r.kind === 'gems' ? 'Кристаллы' : r.kind === 'bling' ? 'Блинги' : ''),
-    );
+    const card = rewardReveal(app, r);
     root.querySelector('.box-reward')?.remove();
     root.querySelector('.box-left')?.remove();
     root.append(card, h('div.box-left.t', `Осталось: ${rewards.length - i}`));
-    sfx(r.kind === 'skin' ? 'levelup' : r.kind === 'coins' ? 'coin' : 'reward');
+    sfx(r.kind === 'skin' || r.kind === 'hero' ? 'levelup' : r.kind === 'coins' ? 'coin' : 'reward');
   };
   root.addEventListener('click', () => {
     if (stage === 0) {

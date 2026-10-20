@@ -69,7 +69,7 @@ export class World implements WorldApi {
       hp, maxHp: hp, baseHp: hp, dmgMul: mul,
       ammo: BATTLE.maxAmmo, attackReadyAt: 0, superCharge: 0,
       alive: true, deadAt: 0, respawnAt: 0, lastHurt: -99, lastShot: -99, revealUntil: 0, inBush: false,
-      gems: 0, cubes: 0, dash: null, knock: null, emote: -1, emoteUntil: 0,
+      gems: 0, cubes: 0, dash: null, knock: null, leap: null, stunUntil: 0, emote: -1, emoteUntil: 0,
       shotAt: -99, superAt: -99, hurtAt: -99, spawnX: x, spawnY: y,
       stats: { damage: 0, kills: 0, deaths: 0, gems: 0, supers: 0, hits: 0, cubes: 0 },
     };
@@ -81,7 +81,7 @@ export class World implements WorldApi {
   /** Воскрешение бойца на точке. */
   respawn(f: Fighter, x: number, y: number) {
     f.alive = true; f.hp = f.maxHp; f.ammo = BATTLE.maxAmmo; f.x = f.px = x; f.y = f.py = y;
-    f.infectedUntil = 0; f.dash = null; f.knock = null; f.lastHurt = -99; f.revealUntil = 0;
+    f.infectedUntil = 0; f.dash = null; f.knock = null; f.leap = null; f.stunUntil = 0; f.lastHurt = -99; f.revealUntil = 0;
     f.facing = f.team === 0 ? -Math.PI / 2 : Math.PI / 2;
     this.emit({ t: 'spawn', id: f.id });
   }
@@ -126,9 +126,17 @@ export class World implements WorldApi {
     if (this.time - f.lastHurt >= BATTLE.healDelay && this.time - f.lastShot >= BATTLE.healDelay && f.hp < f.maxHp) {
       f.hp = Math.min(f.maxHp, f.hp + f.maxHp * BATTLE.healPerSec * dt);
     }
-    // рывок / отбрасывание
+    // прыжок / оглушение / рывок / отбрасывание
     let forced = false;
-    if (f.dash) {
+    if (f.leap) {
+      const L = f.leap;
+      const k = Math.min(1, (this.time - L.t0) / Math.max(1e-6, L.t1 - L.t0));
+      f.x = L.x0 + (L.x1 - L.x0) * k; f.y = L.y0 + (L.y1 - L.y0) * k;
+      forced = true;
+      // приземление делает герой (по таймеру); это страховка, если таймер потерялся
+      if (this.time > L.t1 + 0.5) { f.leap = null; this.map.resolveCircle(f, f.radius); }
+    } else if (this.time < f.stunUntil) forced = true;
+    if (!forced && f.dash) {
       if (this.time >= f.dash.until) f.dash = null;
       else { forced = true; this.dashStep(f); }
     }
@@ -142,7 +150,8 @@ export class World implements WorldApi {
       if (l > 1) { mx /= l; my /= l; }
       f.moving = l > 0.1;
       if (f.moving) {
-        this.map.moveCircle(f, mx * f.speed * dt, my * f.speed * dt, f.radius);
+        const n = inp.steps ?? 1;
+        this.map.moveCircle(f, mx * f.speed * dt * n, my * f.speed * dt * n, f.radius);
         f.facing = Math.atan2(my, mx);
       }
       if (inp.emote >= 0 && this.time >= f.emoteUntil - 1.5) {
@@ -155,7 +164,7 @@ export class World implements WorldApi {
         f.revealUntil = this.time + BATTLE.revealOnShot;
         f.stats.supers++;
         this.emit({ t: 'shot', id: f.id, heroId: f.heroId, sup: true, x: f.x, y: f.y, a });
-        def.superAttack(this, f, a);
+        def.superAttack(this, f, a, inp.superAttack === 2 ? -1 : clamp(inp.power ?? 1, 0, 1));
       } else if (inp.attack && f.ammo >= 1 && this.time >= f.attackReadyAt) {
         const a = inp.attack === 2 ? this.autoAim(f, def.attackAim.range) : inp.aim;
         f.ammo -= 1; f.attackReadyAt = this.time + def.stats.attackCooldown;
@@ -340,7 +349,7 @@ export class World implements WorldApi {
 
   kill(f: Fighter, by?: Fighter) {
     if (!f.alive) return;
-    f.alive = false; f.deadAt = this.time; f.dash = null; f.knock = null;
+    f.alive = false; f.deadAt = this.time; f.dash = null; f.knock = null; f.leap = null; f.stunUntil = 0;
     f.stats.deaths++;
     if (by && by !== f) by.stats.kills++;
     if (f.infectedUntil > 0) { f.infectedUntil = 0; }

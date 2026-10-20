@@ -4,6 +4,7 @@ import { CHANGELOG } from '../../changelog';
 import { GAME_NAME, GAME_VERSION } from '../../config';
 import { defaultSave, exportCode, importCode } from '../../meta/save';
 import { store } from '../../meta/store';
+import { cloud } from '../../net/cloud';
 import type { App } from '../app';
 import { topBar } from '../common';
 import { btn, confirmBox, h, modal, toast } from '../dom';
@@ -42,8 +43,10 @@ export function settingsScreen(app: App): Screen {
       ),
       h('div.sec-title.t', 'Опасная зона'),
       h('div.row', btn('🗑️ Сбросить прогресс', () => {
-        confirmBox('Сбросить прогресс?', 'Пропадут все трофеи, монеты, кристаллы и скины на этом устройстве.', 'Да, сбросить', () => {
+        const acc = cloud.session ? ` Ты выйдешь из аккаунта «${cloud.session.login}», но прогресс в нём останется — в него можно снова войти.` : '';
+        confirmBox('Сбросить прогресс?', 'Пропадут все трофеи, монеты, кристаллы и скины на этом устройстве.' + acc, 'Да, сбросить', () => {
           confirmBox('Точно-точно?', 'Это нельзя отменить! Может, сначала сохранишь код переноса?', 'Сбросить навсегда', () => {
+            cloud.signOut();
             store.replace(defaultSave());
             location.reload();
           });

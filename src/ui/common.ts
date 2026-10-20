@@ -3,6 +3,7 @@ import { GAME_NAME } from '../config';
 import { rewardLabel, totalTrophies } from '../meta/progress';
 import type { Reward } from '../meta/economy';
 import { store } from '../meta/store';
+import { cloud } from '../net/cloud';
 import { btn, h } from './dom';
 
 export interface Nav {
@@ -25,7 +26,7 @@ export function topBar(nav: Nav, opts: { title?: string; back?: boolean } = {}) 
   else {
     left.appendChild(h('div.profile-chip', { onclick: () => nav.open('profile') },
       h('div.avatar', s.avatar.startsWith('hero:') ? h('img', { src: nav.portrait(s.avatar.slice(5)) }) : s.avatar),
-      h('div.pc-text', h('div.pc-nick.t', s.nick || 'Игрок'), h('div.pc-trophies.t', '🏆 ' + totalTrophies(s))),
+      h('div.pc-text', h('div.pc-nick.t', s.nick || 'Игрок', cloud.session ? h('span.pc-cloud', { title: 'Прогресс в облаке' }, ' ☁️') : null), h('div.pc-trophies.t', '🏆 ' + totalTrophies(s))),
     ));
   }
   const right = h('div.tb-right',

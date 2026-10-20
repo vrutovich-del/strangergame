@@ -46,7 +46,10 @@ describe('начисление валют за бой', () => {
     const s = defaultSave();
     expect([s.coins, s.gems, s.bling]).toEqual([100, 30, 0]);
     expect(s.heroes.smile.level).toBe(1);
-    expect(s.heroes.bacteria.level).toBe(1);
+    // в начале открыт только Смайл
+    expect(s.owned).toEqual(['smile']);
+    expect(s.heroes.bacteria).toBeUndefined();
+    expect(s.drops).toEqual([]);
     expect(totalTrophies(s)).toBe(0);
   });
   it('победа: +8 трофеев, +20 монет, блинги за первую победу дня — один раз', () => {
@@ -217,14 +220,14 @@ describe('сохранение и миграции', () => {
     expect(d.gems).toBe(7);
     expect(d.heroes.smile.level).toBe(4);
     expect(d.heroes.smile.skin).toBe('default');
-    expect(d.heroes.bacteria.level).toBe(1);
+    expect(d.owned).toEqual(['smile']);
     expect((d as any).wallet).toBeUndefined();
     expect(d.boxes).toEqual([]);
     expect(d.settings.difficulty).toBe('auto');
   });
-  it('версия 1 → 2', () => {
+  it('версия 1 → текущая', () => {
     const d = migrate({ v: 1, nick: 'Петя', coins: 10, settings: { sfx: 0.2 } });
-    expect(d.v).toBe(2);
+    expect(d.v).toBe(SAVE_VERSION);
     expect(d.settings.sfx).toBe(0.2);
     expect(d.settings.difficulty).toBe('auto');
   });
@@ -248,13 +251,13 @@ describe('сохранение и миграции', () => {
   });
   it('экспорт и импорт кодом (с русским ником)', () => {
     const s = defaultSave();
-    s.nick = 'Странный Чих'; s.gems = 321; s.heroes.bacteria.level = 7;
+    s.nick = 'Странный Чих'; s.gems = 321; s.heroes.smile.level = 7;
     const code = exportCode(s);
     expect(code.startsWith('IS1.')).toBe(true);
     const back = importCode('  ' + code + '\n');
     expect(back?.nick).toBe('Странный Чих');
     expect(back?.gems).toBe(321);
-    expect(back?.heroes.bacteria.level).toBe(7);
+    expect(back?.heroes.smile.level).toBe(7);
     // испорченный код не принимается
     expect(importCode(code.slice(0, -3) + 'zzz')).toBeNull();
     expect(importCode('привет')).toBeNull();

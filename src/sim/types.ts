@@ -1,4 +1,5 @@
 // Типы симуляции боя. Симуляция ничего не знает о Three.js и DOM.
+import type { Rarity } from '../heroes/rarity';
 import type { ModeId } from '../maps/types';
 
 /** Ввод бойца за один тик. Его шлют клиенты по сети и выдают боты. */
@@ -16,6 +17,10 @@ export interface FighterInput {
   emote: number;
   /** Порядковый номер ввода (для предсказания движения в сети). */
   seq: number;
+  /** 0…1 — насколько далеко оттянут прицел супера (куда прыгать, бросать). Нет — 1. */
+  power?: number;
+  /** Сколько тиков движения в этом вводе (хост догоняет отставший ввод друга). Нет — 1. */
+  steps?: number;
 }
 
 export const emptyInput = (): FighterInput => ({ mx: 0, my: 0, aim: 0, attack: 0, superAttack: 0, emote: -1, seq: 0 });
@@ -59,6 +64,8 @@ export interface HeroDef {
   order: number;
   /** Цвет темы в интерфейсе. */
   color: string;
+  /** Редкость героя (чем реже, тем труднее выбить из Старр-дропа и ящика). */
+  rarity?: Rarity;
   stats: HeroStats;
   attackName: string;
   attackDesc: string;
@@ -69,7 +76,8 @@ export interface HeroDef {
   /** Подсказки для ИИ: желаемая дистанция боя. */
   ai: { range: number; style: 'ranged' | 'melee' | 'sniper' | 'shotgun' };
   attack(w: WorldApi, f: Fighter, angle: number): void;
-  superAttack(w: WorldApi, f: Fighter, angle: number): void;
+  /** power — дальность прицела 0…1, или −1 при автоприцеле. */
+  superAttack(w: WorldApi, f: Fighter, angle: number, power: number): void;
   onProjectileHit?(w: WorldApi, p: Projectile, target: Fighter | Minion | null): void;
   updateMinion?(w: WorldApi, m: Minion): void;
 }
@@ -129,6 +137,10 @@ export interface Fighter {
   cubes: number;
   dash: null | { vx: number; vy: number; until: number; hit: number[]; damage: number; knock: number };
   knock: null | { vx: number; vy: number; until: number };
+  /** Прыжок по дуге (над стенами): из (x0, y0) в (x1, y1) за время t0…t1. */
+  leap: null | { x0: number; y0: number; x1: number; y1: number; t0: number; t1: number };
+  /** До этого времени боец не может ходить и стрелять (оглушён или занят суперприёмом). */
+  stunUntil: number;
   emote: number;
   emoteUntil: number;
   /** Моменты событий для анимаций. */

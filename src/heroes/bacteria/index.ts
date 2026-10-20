@@ -10,6 +10,7 @@ const bacteria: HeroDef = {
   playable: true,
   order: 2,
   color: '#b05cff',
+  rarity: 'rare',
   stats: {
     hp: BACTERIA.hp, speed: BACTERIA.speed, reload: BACTERIA.reload, superPerHit: BACTERIA.superPerHit,
     attackCooldown: BACTERIA.attackCooldown, damage: BACTERIA.swarm.damage, superDamage: BACTERIA.super.damage,

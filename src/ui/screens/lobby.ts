@@ -10,7 +10,8 @@ import type { App } from '../app';
 import { topBar, rewardCard } from '../common';
 import { btn, h, modal } from '../dom';
 import type { Screen } from './index';
-import { boxOverlay } from './boxes';
+import { boxOverlay, rarityBadge } from './boxes';
+import { dropOverlay } from './drop';
 import { sfx } from '../../audio/sfx';
 
 let loginShownThisSession = false;
@@ -27,6 +28,9 @@ export function lobbyScreen(app: App): Screen {
   const side = (icon: string, label: string, screen: string, on: boolean, arg?: any) =>
     btn([h('span.sb-ico', icon), h('span.sb-label', label), dot(on)], () => app.open(screen, arg), 'btn-side');
 
+  const drops = s.drops.length
+    ? btn([h('span.sb-ico', '⭐'), h('span.sb-label', 'Дропы'), h('span.badge-num', String(s.drops.length))], () => dropOverlay(app, () => app.refresh()), 'btn-side', { class: 'drop-side' })
+    : null;
   const left = h('div.lobby-left',
     side('🛒', 'Магазин', 'shop', n.shop),
     side('🦸', 'Герои', 'heroes', n.heroes),
@@ -35,7 +39,7 @@ export function lobbyScreen(app: App): Screen {
   const right = h('div.lobby-right',
     side('🎟️', 'Пропуск', 'pass', n.pass),
     side('📜', 'Задания', 'quests', n.quests),
-    side('👥', 'Друзья', 'room', false),
+    drops,
   );
   const mode = s.selectedMode;
   const mi = MODE_INFO[mode];
@@ -48,10 +52,13 @@ export function lobbyScreen(app: App): Screen {
     if (mode === 'training') app.playTraining(lo.heroId, lo.skinId);
     else app.playSolo(mode);
   }, 'btn-yellow', { class: 'btn-play' });
+  // игра с друзьями — одной кнопкой рядом с «ИГРАТЬ»
+  const friends = btn([h('span.fb-ico', '👥'), h('span.fb-label', 'С ДРУЗЬЯМИ'), dot(!!app.room?.alive)], () => app.open('room'), 'btn-blue', { class: 'btn-friends' });
   const heroTag = h('div.hero-tag', { onclick: () => app.open('heroes', lo.heroId) },
     h('div.ht-name.t', getSkin(lo.heroId, lo.skinId).name),
     h('div.ht-row', h('span.lvl-badge', 'Ур. ' + hp.level), h('span.ht-trophies.t', '🏆 ' + hp.trophies)),
     h('div.ht-role', hero.role),
+    rarityBadge(hero.rarity ?? 'common'),
   );
   const settings = btn('⚙️', () => app.open('settings'), 'btn-icon', { class: 'lobby-settings' });
   const center = h('div.lobby-center');
@@ -72,7 +79,7 @@ export function lobbyScreen(app: App): Screen {
     topBar(app),
     settings,
     left, right, center, heroTag,
-    h('div.lobby-bottom', modeCard, play),
+    h('div.lobby-bottom', modeCard, play, friends),
   );
 
   return {
@@ -80,8 +87,12 @@ export function lobbyScreen(app: App): Screen {
     showcase: true,
     onShow() {
       if (!loginShownThisSession && loginAvailable(s)) {
-        loginShownThisSession = true;
-        setTimeout(() => showLoginPopup(app), 500);
+        // не мешаем, если игрок уже ушёл из лобби (например, зашёл в комнату друга по ссылке)
+        setTimeout(() => {
+          if (loginShownThisSession || app.screenName !== 'lobby' || app.battle) return;
+          loginShownThisSession = true;
+          showLoginPopup(app);
+        }, 500);
       }
     },
   };

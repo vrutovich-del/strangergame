@@ -209,6 +209,25 @@ class AudioEngine {
       case 'tick':
         this.tone({ type: 'square', f0: 1400, dur: 0.05, vol: 0.08 * v });
         break;
+      case 'claw':
+        if (!this.gate(name, 0.05)) return;
+        this.noise({ dur: 0.14, vol: 0.24 * v, type: 'bandpass', f0: 2600 * p, f1: 700 * p, q: 1.4 });
+        this.tone({ type: 'sawtooth', f0: 900 * p, f1: 320 * p, dur: 0.08, vol: 0.05 * v });
+        break;
+      case 'roar':
+        if (!this.gate(name, 0.3)) return;
+        this.tone({ type: 'sawtooth', f0: 150 * p, f1: 85 * p, dur: 0.6, vol: 0.16 * v, attack: 0.04 });
+        this.tone({ type: 'square', f0: 225 * p, f1: 110 * p, dur: 0.5, vol: 0.06 * v, attack: 0.03, detune: 14 });
+        this.noise({ dur: 0.55, vol: 0.2 * v, type: 'lowpass', f0: 1300 * p, f1: 300, attack: 0.03 });
+        break;
+      case 'slam':
+        this.tone({ type: 'sine', f0: 170, f1: 40, dur: 0.38, vol: 0.32 * v });
+        this.noise({ dur: 0.32, vol: 0.26 * v, type: 'lowpass', f0: 900, f1: 120 });
+        break;
+      case 'drop':
+        [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone({ type: 'triangle', f0: f * p, dur: 0.18, vol: 0.1 * v, at: T + i * 0.05 }));
+        this.noise({ dur: 0.4, vol: 0.1 * v, type: 'highpass', f0: 5000, at: T + 0.15 });
+        break;
       case 'countdown':
         this.tone({ type: 'square', f0: 660, dur: 0.12, vol: 0.1 * v });
         break;
@@ -250,7 +269,7 @@ export type SfxName =
   | 'shoot_smile' | 'shoot_germ' | 'shoot_robot' | 'laser' | 'punch' | 'hit' | 'hurt' | 'death' | 'deflate' | 'splat'
   | 'super' | 'super_ready' | 'gem' | 'cube' | 'crate' | 'pop' | 'helpers' | 'sneeze' | 'infect' | 'dash'
   | 'click' | 'tab' | 'coin' | 'buy' | 'levelup' | 'win' | 'lose' | 'tick' | 'countdown' | 'go' | 'emote'
-  | 'box_shake' | 'box_open' | 'reward' | 'whoosh' | 'announce' | 'respawn';
+  | 'box_shake' | 'box_open' | 'reward' | 'whoosh' | 'announce' | 'respawn' | 'claw' | 'roar' | 'slam' | 'drop';
 
 export const audio = new AudioEngine();
 export const sfx = (name: SfxName, o?: { pitch?: number; vol?: number }) => audio.play(name, o);
