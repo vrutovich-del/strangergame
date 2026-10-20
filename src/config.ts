@@ -21,8 +21,8 @@ export const TURN_SERVERS: RTCIceServer[] = [];
  * apiKey не секрет: это адрес проекта, его видно в любой веб-игре на Firebase. Защиту дают правила базы.
  */
 export const CLOUD = {
-  apiKey: '',
-  databaseURL: '',
+  apiKey: 'AIzaSyBs-x-kgrv1FYaCW0OjwdQVpq8Fe_aQW8w',
+  databaseURL: 'https://stranger-game-ee0cd-default-rtdb.europe-west1.firebasedatabase.app',
   /** Хвост «почты» для логинов. Почта не настоящая, её никто не проверяет и не видит. */
   emailDomain: 'players.igra-strannostey.game',
 };
