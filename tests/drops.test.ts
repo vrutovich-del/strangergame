@@ -6,6 +6,8 @@ import {
   type BattleContext,
 } from '../src/meta/progress';
 import { defaultSave, migrate, SAVE_VERSION } from '../src/meta/save';
+import { playableHeroes } from '../src/heroes/registry';
+import { allSkins } from '../src/heroes/skins';
 import type { MatchResult } from '../src/sim/types';
 
 const NOW = new Date(2026, 9, 20, 12, 0, 0);
@@ -50,9 +52,11 @@ describe('герои открываются по одному', () => {
   });
   it('уже открытые не выпадают, а когда открыты все — null', () => {
     const s = defaultSave();
-    grant(s, { kind: 'hero', heroId: 'bacteria' });
-    expect(rollHero(s, new Rng(1))).toBe('lion');
-    grant(s, { kind: 'hero', heroId: 'lion' });
+    const all = playableHeroes().map((x) => x.id);
+    for (const id of all.slice(0, -1)) grant(s, { kind: 'hero', heroId: id });
+    const last = all[all.length - 1];
+    expect(rollHero(s, new Rng(1))).toBe(last);
+    grant(s, { kind: 'hero', heroId: last });
     expect(rollHero(s, new Rng(1))).toBeNull();
   });
   it('из ящиков выпадают только новые герои', () => {
@@ -61,7 +65,7 @@ describe('герои открываются по одному', () => {
     for (let i = 0; i < 2000; i++) {
       const s = defaultSave();
       grant(s, { kind: 'hero', heroId: 'bacteria' });
-      for (const r of openBox(s, 'mega', rng)) if (r.kind === 'hero') { heroes++; expect(r.heroId).toBe('lion'); }
+      for (const r of openBox(s, 'mega', rng)) if (r.kind === 'hero') { heroes++; expect(['smile', 'bacteria']).not.toContain(r.heroId); }
     }
     expect(heroes / 2000).toBeGreaterThan(0.04);
     expect(heroes / 2000).toBeLessThan(0.1);
@@ -123,9 +127,8 @@ describe('Старр-дропы', () => {
   it('всё уже есть — вместо героя и скина кристаллы', () => {
     const rng = new Rng(2);
     const s = defaultSave();
-    grant(s, { kind: 'hero', heroId: 'bacteria' });
-    grant(s, { kind: 'hero', heroId: 'lion' });
-    s.skins = ['smile:angry', 'smile:cosmo', 'smile:mint', 'bacteria:king', 'bacteria:rainbow', 'bacteria:fire', 'lion:snow', 'lion:shadow'];
+    for (const x of playableHeroes()) grant(s, { kind: 'hero', heroId: x.id });
+    s.skins = allSkins().filter((k) => k.id !== 'default').map((k) => `${k.heroId}:${k.id}`);
     for (let i = 0; i < 300; i++) {
       const { item } = openStarrDrop(s, 'legendary', rng);
       expect(item.kind === 'hero' || item.kind === 'skin').toBe(false);

@@ -12,6 +12,9 @@ export interface HudSelf {
   respawnIn: number;
   infected: boolean;
   heroColor: string;
+  /** Сколько ещё стоит остановленное время (0 — идёт) и остановила ли его своя команда. */
+  timeStop?: number;
+  timeStopMine?: boolean;
 }
 
 export class Hud {
@@ -22,6 +25,8 @@ export class Hud {
   private tip: HTMLElement;
   private dead: HTMLElement;
   private haze: HTMLElement;
+  private timeFx: HTMLElement;
+  private timeLabel: HTMLElement;
   private moveBase: HTMLElement;
   private moveKnob: HTMLElement;
   private atk: HTMLElement;
@@ -48,6 +53,8 @@ export class Hud {
     this.tip = h('div.hud-tip');
     this.dead = h('div.hud-dead');
     this.haze = h('div.haze');
+    this.timeFx = h('div.timestop-fx');
+    this.timeLabel = h('div.hud-timestop');
     this.moveBase = h('div.stick.stick-move', this.moveKnob = h('div.knob'));
     this.atk = h('div.stick.stick-attack', this.atkKnob = h('div.knob', h('span.ico', '✊')));
     this.supFill = h('div.sup-fill');
@@ -57,7 +64,7 @@ export class Hud {
     const emote = btn('😀', () => this.toggleEmotes(), 'btn-icon', { class: 'hud-emote no-aim' });
     this.hint = h('div.hud-hint', 'WASD — бег · Мышь — прицел · ЛКМ — атака · ПКМ или E — супер · Пробел — автоатака · T — эмоция · Esc — пауза');
     this.hint.style.display = showHints && input.device === 'desktop' ? '' : 'none';
-    this.root.append(this.haze, this.top, this.countdown, this.announce, this.banner, this.tip, this.dead, this.moveBase, this.atk, this.sup, this.ammoBar, pause, emote, this.hint);
+    this.root.append(this.haze, this.timeFx, this.timeLabel, this.top, this.countdown, this.announce, this.banner, this.tip, this.dead, this.moveBase, this.atk, this.sup, this.ammoBar, pause, emote, this.hint);
     if (mode === 'training') {
       const exit = btn('Выйти', () => this.onExit?.(), 'btn-red', { class: 'hud-exit no-aim' });
       this.root.appendChild(exit);
@@ -137,6 +144,14 @@ export class Hud {
     }
     this.atk.classList.toggle('empty', me.ammo < 1);
     this.haze.classList.toggle('show', me.infected);
+    // остановленное время: сиреневая рамка и обратный отсчёт
+    const ts = me.timeStop ?? 0;
+    this.timeFx.classList.toggle('show', ts > 0);
+    this.timeLabel.classList.toggle('show', ts > 0);
+    if (ts > 0) {
+      const txt = `⏱ ${me.timeStopMine ? 'Время стоит!' : 'Ты замер!'} ${Math.ceil(ts)}`;
+      if (this.timeLabel.textContent !== txt) this.timeLabel.textContent = txt;
+    }
     // смерть
     if (!me.alive) {
       this.dead.style.display = '';

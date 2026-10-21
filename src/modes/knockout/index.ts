@@ -67,6 +67,7 @@ export class Knockout implements ModeRules {
     const w = m.world;
     this.round++;
     w.zone = null;
+    w.timeStop = null;
     w.projectiles = [];
     w.minions = [];
     w.pickups = [];

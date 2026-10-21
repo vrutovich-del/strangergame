@@ -12,7 +12,7 @@ import { MapView } from './mapView';
 import { Character, createCharacter, isRobot } from './models';
 import type { GameRenderer } from './renderer';
 import { addLights } from './showcase';
-import { blobTexture, clawTexture, energyTexture, germTexture, helperFaceTexture, smileTexture } from './textures';
+import { blobTexture, clawTexture, energyTexture, germTexture, helperFaceTexture, pickaxeTexture, smileTexture, timeballTexture } from './textures';
 
 export interface AimVisual { shape: AimShape; range: number; width: number; angle: number; isSuper: boolean; dist: number }
 
@@ -28,6 +28,15 @@ interface FV {
 }
 
 const RAINBOW = [0xff4b55, 0xff9b3f, 0xffd23f, 0x5ee05a, 0x3fa9ff, 0xb05cff];
+/** Цвета героев: снаряды по умолчанию, искры выстрела и «осколки» при выбивании. */
+const HERO_FX: Record<string, { shot: number; sparks: number[]; death: number[] }> = {
+  smile: { shot: 0xffd23f, sparks: [0xffe066, 0xffffff], death: [0xffd23f, 0xf28a17, 0xffffff] },
+  bacteria: { shot: 0xb05cff, sparks: [0xc77aff, 0x9dff5a], death: [0xb05cff, 0x7fe04a, 0x2f1a3c] },
+  lion: { shot: 0xffc24a, sparks: [0xffc24a, 0xffffff, 0xf26a2a], death: [0xe8a240, 0xdc6220, 0xf8e2b4] },
+  stoptime: { shot: 0x9f8cff, sparks: [0x9f8cff, 0xffffff, 0xffd84a], death: [0xffc933, 0x9f8cff, 0xfff6dc, 0x3a2a4a] },
+  miner: { shot: 0xb0b8c8, sparks: [0xd8c8a8, 0xffffff, 0xffc21f], death: [0xffc21f, 0x3f74b3, 0xd94a3a, 0x8a5a32] },
+};
+const FROZEN_FX = [0x9fd8ff, 0xffffff, 0x9f8cff];
 const SIDE_COLOR = { self: 0x7dff5a, ally: 0x3fa9ff, enemy: 0xff4b55 };
 const EMOTES = ['😀', '👍', '😢', '😡', '😎', '🤣', '🥳', '🤖', '🔥', '💪', '🦠', '⭐'];
 export const emoteChar = (i: number) => EMOTES[i] ?? '❓';
@@ -134,10 +143,15 @@ export class BattleView {
         v.green += ((infected ? 1 : 0) - v.green) * Math.min(1, dt * 6);
         v.c.green = v.green;
         const helpers = f.heroId === 'smile' && w.minions.some((m) => m.ownerId === f.id && m.alive);
-        v.c.animate({
-          t: this.wallClock + f.id * 0.37, dt, move: v.move, shot: time - f.shotAt, sup: time - f.superAt, hurt: time - f.hurtAt,
-          dead: deadFor, win: false, lose: false, showcase: false, helpers, infected,
-        });
+        // остановленное время: замерший боец не шевелится (поза застывает) и становится ледяным
+        const frozen = f.alive && w.isFrozen(f);
+        v.c.frozen += ((frozen ? 1 : 0) - v.c.frozen) * Math.min(1, dt * 8);
+        if (!frozen) {
+          v.c.animate({
+            t: this.wallClock + f.id * 0.37, dt, move: v.move, shot: time - f.shotAt, sup: time - f.superAt, hurt: time - f.hurtAt,
+            dead: deadFor, win: false, lose: false, showcase: false, helpers, infected,
+          });
+        }
         v.c.updateMaterials(dt);
         v.ring.visible = f.alive;
         v.shadow.visible = f.alive || deadFor < 0.5;
@@ -174,7 +188,7 @@ export class BattleView {
     if (!owner) return 0xffd23f;
     const skin = getSkin(owner.heroId, owner.skinId);
     if (skin.shotColor === -1) return RAINBOW[p.id % RAINBOW.length];
-    return skin.shotColor ?? (owner.heroId === 'bacteria' ? 0xb05cff : owner.heroId === 'lion' ? 0xffc24a : 0xffd23f);
+    return skin.shotColor ?? HERO_FX[owner.heroId]?.shot ?? 0xffd23f;
   }
 
   private makeProj(w: World, p: Projectile): THREE.Object3D {
@@ -191,6 +205,8 @@ export class BattleView {
       case 'beam': tex = energyTexture(team); size = 0.9; additive = true; break;
       case 'punch': tex = blobTexture(); size = 0.01; break;
       case 'claw': tex = clawTexture(this.projColor(w, p), p.id % 2 === 1); size = 1.5; break;
+      case 'timeball': tex = timeballTexture(this.projColor(w, p)); size = 0.7; break;
+      case 'pickaxe': tex = pickaxeTexture(this.projColor(w, p)); size = 0.85; break;
       default: tex = energyTexture(team);
     }
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending });
@@ -199,7 +215,7 @@ export class BattleView {
     const s = new THREE.Sprite(mat);
     s.scale.setScalar(size);
     s.userData.kind = p.kind;
-    s.userData.spin = p.kind.startsWith('germ') ? 6 : p.kind.startsWith('smile') ? 4 : 0;
+    s.userData.spin = p.kind.startsWith('germ') ? 6 : p.kind.startsWith('smile') ? 4 : p.kind === 'pickaxe' ? -14 : p.kind === 'timeball' ? 3 : 0;
     this.scene.add(s);
     return s;
   }
@@ -213,7 +229,9 @@ export class BattleView {
       const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha);
       o.position.set(x, 0.75, y);
       const s = o as THREE.Sprite;
-      if (o.userData.spin) s.material.rotation += dt * o.userData.spin;
+      const hanging = w.timeStopped && p.team !== w.timeStop!.team;
+      if (o.userData.spin && !hanging) s.material.rotation += dt * o.userData.spin;
+      if (p.kind === 'timeball' && Math.random() < 0.5) this.particles.spawn({ x, y: 0.75, z: y, n: 1, color: [this.projColor(w, p), 0xffffff], speed: 0.4, up: 0.3, size: 0.07, life: 0.35, grav: 0 });
       if (p.kind === 'germ_big' && Math.random() < 0.6) this.particles.spawn({ x, y: 0.7, z: y, n: 1, color: [0x9dff5a, 0xc77aff], speed: 0.6, up: 0.6, size: 0.12, life: 0.5, grav: 0 });
       if ((p.kind === 'laser' || p.kind === 'beam') && Math.random() < 0.8) this.particles.spawn({ x, y: 0.75, z: y, n: 1, color: p.team === this.localTeam ? 0x9ff4ff : 0xff8a8a, speed: 0.2, up: 0, size: 0.1, life: 0.25, grav: 0 });
     }
@@ -438,7 +456,7 @@ export class BattleView {
         case 'shot': {
           const f = w.findById(e.id);
           const v = f ? this.fvs.get(f.id) : undefined;
-          const col = f ? (f.heroId === 'bacteria' ? [0xc77aff, 0x9dff5a] : f.heroId === 'smile' ? [0xffe066, 0xffffff] : f.heroId === 'lion' ? [0xffc24a, 0xffffff, 0xf26a2a] : [0x9ff4ff, 0xffffff]) : [0xffffff];
+          const col = f ? HERO_FX[f.heroId]?.sparks ?? [0x9ff4ff, 0xffffff] : [0xffffff];
           const x = e.x + Math.cos(e.a) * 0.5, z = e.y + Math.sin(e.a) * 0.5;
           if (e.heroId === 'smile_helper') { this.particles.spawn({ x, y: 1.1, z, n: 2, color: [0xffe066], speed: 1, up: 0.5, size: 0.06, life: 0.2 }); break; }
           this.particles.spawn({ x, y: 0.75, z, n: Math.ceil(4 * fx), color: col, speed: 3, up: 1, size: 0.07, life: 0.25, dirX: Math.cos(e.a), dirZ: Math.sin(e.a), spread: 0.5 });
@@ -470,7 +488,7 @@ export class BattleView {
         }
         case 'death': {
           const f = w.findById(e.id);
-          const col = f?.heroId === 'bacteria' ? [0xb05cff, 0x7fe04a, 0x2f1a3c] : f?.heroId === 'smile' ? [0xffd23f, 0xf28a17, 0xffffff] : f?.heroId === 'lion' ? [0xe8a240, 0xdc6220, 0xf8e2b4] : [0x9aa6bf, 0x2b3245, f?.team === this.localTeam ? 0x3fa9ff : 0xff4b55];
+          const col = (f && HERO_FX[f.heroId]?.death) ?? [0x9aa6bf, 0x2b3245, f?.team === this.localTeam ? 0x3fa9ff : 0xff4b55];
           this.particles.spawn({ x: e.x, y: 0.7, z: e.y, n: Math.ceil(26 * fx), color: col, speed: 5, up: 5, size: 0.12, life: 0.9 });
           this.flashes.ring(e.x, e.y, 0xffffff, 2.2, 0.45);
           if (e.id === this.localId) this.addShake(0.6);
@@ -478,6 +496,13 @@ export class BattleView {
         }
         case 'impact': {
           if (e.kind === 'box') { this.map.shakeBox(Math.floor(e.x), Math.floor(e.y), this.wallClock); this.particles.spawn({ x: e.x, y: 0.8, z: e.y, n: 3, color: [0x9aa0b0, 0x5ee05a], speed: 2, up: 2, size: 0.06, life: 0.3 }); break; }
+          if (e.kind === 'miner_slam') {
+            this.flashes.ring(e.x, e.y, 0xffc21f, 3.6, 0.45);
+            this.flashes.ring(e.x, e.y, 0xffffff, 2.4, 0.3);
+            this.particles.spawn({ x: e.x, y: 0.2, z: e.y, n: Math.ceil(26 * fx), color: [0x9a8a7a, 0xc07a3c, 0xffe066, 0xffffff], speed: 5.5, up: 4, size: 0.14, life: 0.7 });
+            if (this.near(w, e.x, e.y, 7)) this.addShake(this.near(w, e.x, e.y, 2) ? 0.9 : 0.5);
+            break;
+          }
           if (e.kind === 'lion_slam') {
             this.flashes.ring(e.x, e.y, 0xffc24a, 3.4, 0.45);
             this.flashes.ring(e.x, e.y, 0xffffff, 2.2, 0.3);
@@ -541,6 +566,20 @@ export class BattleView {
           break;
         }
         case 'beam': this.flashes.beam(e.x, e.y, e.x2, e.y2, e.team === this.localTeam ? 0x7fe8ff : 0xff6a7a); break;
+        case 'timestop': {
+          const f = w.findById(e.id);
+          if (f) {
+            this.flashes.ring(f.x, f.y, 0x9f8cff, 9, 0.8);
+            this.flashes.ring(f.x, f.y, 0xffffff, 5, 0.5);
+            this.particles.spawn({ x: f.x, y: 1.2, z: f.y, n: Math.ceil(30 * fx), color: [0x9f8cff, 0xffffff, 0xffd84a], speed: 6, up: 2, size: 0.1, life: 0.8, grav: 0 });
+          }
+          for (const o of w.fighters) {
+            if (!o.alive || w.effTeam(o) === e.team) continue;
+            this.particles.spawn({ x: o.x, y: 1.0, z: o.y, n: Math.ceil(10 * fx), color: FROZEN_FX, speed: 1.5, up: 1.5, size: 0.08, life: 0.6 });
+          }
+          this.addShake(0.5);
+          break;
+        }
         case 'spawn': {
           const f = w.findById(e.id);
           const v = this.fvs.get(e.id);

@@ -16,6 +16,18 @@ export const SKINS: SkinDef[] = [
     shotColor: -1, sfxPitch: 1.15,
   },
   {
+    id: 'ghost', heroId: 'bacteria', name: 'Бактерия-Призрак', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#c8c0ff',
+    desc: 'Новая модель: без ножек, с волнистым хвостиком. Парит над землёй, а при выбивании улетает вверх!',
+    palette: { skin: 0xe8e4ff, hair: 0xffffff, spotA: 0xc8c0ff, spotB: 0xb0a8f0, spotC: 0xd8d0ff, sclera: 0xffffff, iris: 0x5fc8ff, irisRing: 0x2a6fa0, lip: 0x6a6a9a, mouth: 0x3a3a6a, brow: 0x6a6a9a, goggleRim: 0xd8d8f0, strap: 0x9a90c8, strapDark: 0x7a70a8, glowGreen: 0x9fe8ff, glowPurple: 0xc8a8ff },
+    shotColor: 0xd8d0ff, sfxPitch: 1.3,
+  },
+  {
+    id: 'jelly', heroId: 'bacteria', name: 'Бактерия-Медуза', price: 149, currency: 'gems', rarity: 'legendary', cardColor: '#ff7bd5',
+    desc: 'Новая модель: прозрачный светящийся купол и щупальца. Плывёт по воздуху, как настоящая медуза!',
+    palette: { skin: 0x2a3a8a, hair: 0x7fd8ff, spotA: 0xff7bd5, spotB: 0x7fd8ff, spotC: 0xb08bff, glowGreen: 0x7fd8ff, glowPurple: 0xff7bd5, sclera: 0xfff3a0 },
+    shotColor: 0xff9ad8, sfxPitch: 1.1,
+  },
+  {
     id: 'fire', heroId: 'bacteria', name: 'Огненная Бактерия', price: 250, currency: 'bling', rarity: 'rare', cardColor: '#ff7a2a',
     desc: 'Цветовая вариация: горячая, как вулкан.',
     palette: { skin: 0x4a1608, hair: 0xff6a00, spotA: 0xff4b1f, spotB: 0xffa31f, spotC: 0xffd23f, sclera: 0xfff2a8, iris: 0xff6a00, irisRing: 0x8a2a00, glowGreen: 0xffa31f },

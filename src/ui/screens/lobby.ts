@@ -76,8 +76,7 @@ export function lobbyScreen(app: App): Screen {
   center.addEventListener('pointercancel', () => { drag = null; });
 
   const el = h('div.screen.lobby',
-    topBar(app),
-    settings,
+    topBar(app, { extra: settings }),
     left, right, center, heroTag,
     h('div.lobby-bottom', modeCard, play, friends),
   );

@@ -72,3 +72,30 @@ export function canvasTexture(size: number, draw: (ctx: CanvasRenderingContext2D
 }
 
 export const hexStr = (c: number) => '#' + c.toString(16).padStart(6, '0');
+
+/** Прикрепить деталь к узлу так, чтобы она оказалась в точке модели p (в координатах корня модели). */
+export function attachAt(root: THREE.Object3D, parent: THREE.Object3D, obj: THREE.Object3D, p: [number, number, number], r?: [number, number, number]) {
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const pm = new THREE.Matrix4().multiplyMatrices(inv, parent.matrixWorld);
+  const pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  pm.decompose(pos, q, sc);
+  const local = new THREE.Vector3(...p).applyMatrix4(pm.clone().invert());
+  obj.position.copy(local);
+  obj.quaternion.copy(q.invert());
+  if (r) obj.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...r)));
+  obj.scale.divide(sc);
+  parent.add(obj);
+  return obj;
+}
+
+/** Кэш материалов одной модели: одинаковые цвета — один материал (меньше вызовов отрисовки). */
+export function matKit(prefix: string) {
+  const cache = new Map<string, THREE.MeshToonMaterial>();
+  return (color: number, o: Parameters<typeof toon>[1] = {}) => {
+    const key = `${color}:${o.emissive ?? ''}:${o.ei ?? ''}:${o.transparent ? o.opacity : ''}`;
+    let m = cache.get(key);
+    if (!m) { m = toon(color, { ...o, name: o.name ?? `${prefix}_${color.toString(16)}_${cache.size}` }); cache.set(key, m); }
+    return m;
+  };
+}

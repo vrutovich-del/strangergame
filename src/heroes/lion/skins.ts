@@ -14,6 +14,22 @@ export const SKINS: SkinDef[] = [
     shotColor: 0x9fe0ff, sfxPitch: 1.1,
   },
   {
+    id: 'dragon', heroId: 'lion', name: 'Лев-Дракон', price: 149, currency: 'gems', rarity: 'legendary', cardColor: '#2a9a7a',
+    desc: 'Новая модель: крылья, рога и шипы на хвосте. Машет крыльями на бегу и в прыжке хищника!',
+    palette: {
+      fur: 0x4fae5a, furLight: 0x7fd88a, cream: 0xd8f0a8, earInner: 0xa8e0a0,
+      maneLight: 0x3fd8a8, maneMid: 0x2a9a7a, maneDark: 0x1f6a5a, maneRed: 0x174a40,
+      brow: 0x1f4a2a, iris: 0xffd23f, irisRing: 0xc87a00, vest: 0x5a2a4a, leather: 0x3a1f30, leatherDark: 0x2a1424, claw: 0xffd23f, headband: 0x8a2a5a, headbandDark: 0x5a1a3a,
+    },
+    shotColor: 0xff8a2a, sfxPitch: 0.8,
+  },
+  {
+    id: 'knight', heroId: 'lion', name: 'Лев-Рыцарь', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#3a5a9a',
+    desc: 'Новая модель: шлем с пером, латы, щит и плащ. Бежит гордо, подняв голову, а плащ развевается!',
+    palette: { vest: 0x3a5a9a, cloth: 0x3a5a9a, leather: 0x6a4a2a, metal: 0xd8dce6, spike: 0xffd23f, headband: 0x3a5a9a, headbandDark: 0x24407a },
+    shotColor: 0x9fd8ff, sfxPitch: 0.95,
+  },
+  {
     id: 'shadow', heroId: 'lion', name: 'Теневой Лев', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#8a3cd0',
     desc: 'Тёмная шерсть, фиолетовая грива и светящиеся глаза.',
     palette: {

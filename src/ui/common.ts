@@ -17,7 +17,7 @@ function currency(icon: string, value: number, cls: string, onPlus: () => void) 
   return h('div.cur.' + cls, h('span.cur-ico', icon), h('span.cur-val', String(value)), btn('+', onPlus, 'btn-green', { class: 'cur-plus' }));
 }
 
-export function topBar(nav: Nav, opts: { title?: string; back?: boolean } = {}) {
+export function topBar(nav: Nav, opts: { title?: string; back?: boolean; extra?: HTMLElement } = {}) {
   const s = store.data;
   const bar = h('div.topbar');
   const left = h('div.tb-left');
@@ -33,6 +33,7 @@ export function topBar(nav: Nav, opts: { title?: string; back?: boolean } = {}) 
     currency('🪙', s.coins, 'coins', () => nav.open('shop', 'gems')),
     currency('💎', s.gems, 'gems', () => nav.open('shop', 'gems')),
     currency('✨', s.bling, 'bling', () => nav.open('shop', 'emotes')),
+    opts.extra ?? null,
   );
   bar.append(left, right);
   return bar;

@@ -85,7 +85,7 @@ export function accountForm(mode: AccountMode, onDone: (mode: AccountMode) => vo
   const submit = btn(mode === 'register' ? 'СОЗДАТЬ АККАУНТ' : 'ВОЙТИ', () => void go(), 'btn-yellow');
   return h('div.acc-form',
     h('div.first-title.t', mode === 'register' ? 'Новый аккаунт' : 'Вход в аккаунт'),
-    login, pass, mode === 'register' ? pass2 : null,
+    h('div.acc-fields', login, pass, mode === 'register' ? pass2 : null),
     err,
     submit,
     mode === 'register' ? h('div.small', 'Логин придумай сам — не пиши настоящее имя. Пароль никому не говори!') : null,

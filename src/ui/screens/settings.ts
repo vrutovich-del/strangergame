@@ -9,6 +9,7 @@ import type { App } from '../app';
 import { topBar } from '../common';
 import { btn, confirmBox, h, modal, toast } from '../dom';
 import type { Screen } from './index';
+import { enableDragScroll } from './shop';
 
 function toggle(label: string, on: boolean, set: (v: boolean) => void) {
   const el = h('div.setting', h('span.set-l', label), btn(on ? 'Вкл' : 'Выкл', () => set(!on), on ? 'btn-green' : 'btn-gray', { class: 'btn-sm' }));
@@ -21,28 +22,35 @@ function slider(label: string, value: number, set: (v: number) => void) {
   return h('div.setting', h('span.set-l', label), input);
 }
 function choice<T extends string>(label: string, value: T, opts: [T, string][], set: (v: T) => void) {
-  return h('div.setting', h('span.set-l', label), h('div.choice', ...opts.map(([v, t]) => btn(t, () => set(v), v === value ? 'btn-yellow' : 'btn-gray', { class: 'btn-sm' }))));
+  return h('div.setting.choice-set', h('span.set-l', label), h('div.choice', ...opts.map(([v, t]) => btn(t, () => set(v), v === value ? 'btn-yellow' : 'btn-gray', { class: 'btn-sm' }))));
 }
 
 export function settingsScreen(app: App): Screen {
   const s = store.data;
   const st = s.settings;
   const re = () => app.open('settings');
-  const el = h('div.screen.panel-screen.settings', topBar(app, { title: 'Настройки', back: true }),
-    h('div.scroll.settings-body',
+  const panel = (title: string, ...children: HTMLElement[]) => h('div.panel', h('div.panel-title.t', title), ...children);
+  const scroller = h('div.hscroll.panels', h('div.panel-row',
+    panel('🎛️ Основное',
       slider('🔊 Звуки', st.sfx, (v) => { st.sfx = v; audio.sfxVolume = v; audio.applyVolumes(); store.commit(); }),
       slider('🎵 Музыка', st.music, (v) => { st.music = v; audio.musicVolume = v; audio.applyVolumes(); store.commit(); }),
       toggle('📳 Вибрация', st.vibration, (v) => { st.vibration = v; audio.vibration = v; store.commit(); if (v) audio.vibrate(40); re(); }),
+      toggle('💡 Подсказки', st.hints, (v) => { st.hints = v; store.commit(); re(); }),
+    ),
+    panel('🎮 Игра',
       choice('🖼️ Графика', st.quality, [['auto', 'Авто'], ['low', 'Низкая'], ['high', 'Высокая']], (v) => { st.quality = v; app.r.setQuality(v); store.commit(); re(); }),
-      toggle('💡 Подсказки управления', st.hints, (v) => { st.hints = v; store.commit(); re(); }),
       choice('🤖 Роботы', st.difficulty, [['auto', 'Авто'], ['easy', 'Лёгкие'], ['normal', 'Обычные'], ['hard', 'Сложные']], (v) => { st.difficulty = v; store.commit(); re(); }),
-      h('div.sec-title.t', 'Перенос прогресса'),
-      h('div.row',
-        btn('📤 Получить код', () => showExport(), 'btn-blue', { class: 'btn-sm' }),
-        btn('📥 Ввести код', () => showImport(app), 'btn-blue', { class: 'btn-sm' }),
-      ),
-      h('div.sec-title.t', 'Опасная зона'),
-      h('div.row', btn('🗑️ Сбросить прогресс', () => {
+    ),
+    panel('💾 Перенос прогресса',
+      h('div.small', 'Код переноса — чтобы играть на другом устройстве без аккаунта.'),
+      btn('📤 Получить код', () => showExport(), 'btn-blue', { class: 'btn-sm' }),
+      btn('📥 Ввести код', () => showImport(app), 'btn-blue', { class: 'btn-sm' }),
+      btn('📰 Что нового', () => whatsNew(), 'btn-purple', { class: 'btn-sm' }),
+      h('div.version', `${GAME_NAME} · версия ${GAME_VERSION}`),
+    ),
+    panel('⚠️ Опасная зона',
+      h('div.small', 'Сброс удалит весь прогресс на этом устройстве.'),
+      btn('🗑️ Сбросить прогресс', () => {
         const acc = cloud.session ? ` Ты выйдешь из аккаунта «${cloud.session.login}», но прогресс в нём останется — в него можно снова войти.` : '';
         confirmBox('Сбросить прогресс?', 'Пропадут все трофеи, монеты, кристаллы и скины на этом устройстве.' + acc, 'Да, сбросить', () => {
           confirmBox('Точно-точно?', 'Это нельзя отменить! Может, сначала сохранишь код переноса?', 'Сбросить навсегда', () => {
@@ -51,12 +59,11 @@ export function settingsScreen(app: App): Screen {
             location.reload();
           });
         });
-      }, 'btn-red', { class: 'btn-sm' })),
-      h('div.row', btn('📰 Что нового', () => whatsNew(), 'btn-purple', { class: 'btn-sm' })),
-      h('div.version', `${GAME_NAME} · версия ${GAME_VERSION}`),
+      }, 'btn-red', { class: 'btn-sm' }),
     ),
-  );
-  return { el };
+  ));
+  const el = h('div.screen.panel-screen.settings', topBar(app, { title: 'Настройки', back: true }), scroller);
+  return { el, onShow: () => enableDragScroll(scroller) };
 }
 
 function showExport() {
@@ -94,8 +101,20 @@ function showImport(app: App) {
 
 /** Экран «Что нового». */
 export function whatsNew() {
-  modal(h('div.whatsnew',
-    h('h2', '📰 Что нового'),
-    ...CHANGELOG.map((c) => h('div.wn-entry', h('div.wn-ver.t', `Версия ${c.version}`), h('ul', ...c.items.map((i) => h('li', i))))),
-  ));
+  // версии — карточками в ленту вбок: новая слева
+  // длинную версию делим на несколько карточек, чтобы каждая помещалась по высоте
+  const cards: HTMLElement[] = [];
+  for (const c of CHANGELOG) {
+    const parts: string[][] = [[]];
+    let len = 0;
+    for (const i of c.items) {
+      if (len > 0 && len + i.length > 230) { parts.push([]); len = 0; }
+      parts[parts.length - 1].push(i);
+      len += i.length + 40;
+    }
+    parts.forEach((items, k) => cards.push(h('div.wn-entry', h('div.wn-ver.t', `Версия ${c.version}` + (parts.length > 1 ? ` (${k + 1}/${parts.length})` : '')), h('ul', ...items.map((i) => h('li', i))))));
+  }
+  const list = h('div.hscroll.wn-list', ...cards);
+  modal(h('div.whatsnew', h('h2', '📰 Что нового'), list), { cls: 'wide' });
+  enableDragScroll(list);
 }

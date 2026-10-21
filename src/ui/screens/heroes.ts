@@ -11,6 +11,7 @@ import { topBar } from '../common';
 import { btn, h, modal, toast } from '../dom';
 import { rarityBadge } from './boxes';
 import type { Screen } from './index';
+import { enableDragScroll } from './shop';
 
 /** Где взять закрытого героя. */
 export function howToGet(heroId: string) {
@@ -22,7 +23,7 @@ export function howToGet(heroId: string) {
 
 export function heroesScreen(app: App, focus?: string): Screen {
   const s = store.data;
-  const grid = h('div.hero-grid');
+  const grid = h('div.hero-row');
   const all = playableHeroes();
   const owned = all.filter((d) => ownsHero(s, d.id)).length;
   for (const d of all) {
@@ -45,9 +46,10 @@ export function heroesScreen(app: App, focus?: string): Screen {
     grid.appendChild(card);
   }
   grid.appendChild(h('div.hero-card.soon', h('div.soon-q', '?'), h('div.hc-name.t', `Герой №${all.length + 1}`), h('div.hc-role', 'Скоро! Автор уже придумывает…')));
-  const el = h('div.screen.panel-screen', topBar(app, { title: `Герои ${owned}/${all.length}`, back: true }), h('div.scroll', grid));
+  const scroller = h('div.hscroll.hero-scroll', grid);
+  const el = h('div.screen.panel-screen', topBar(app, { title: `Герои ${owned}/${all.length}`, back: true }), scroller);
   if (focus) setTimeout(() => heroDetail(app, focus), 50);
-  return { el };
+  return { el, onShow: () => enableDragScroll(scroller) };
 }
 
 function statRow(label: string, a: number | string, b?: number | string) {
@@ -58,6 +60,8 @@ export function heroDetail(app: App, heroId: string) {
   const s = store.data;
   const d = getHero(heroId);
   let close = () => {};
+  // справа две вкладки: «Герой» (характеристики) и «Скины» (лента вбок) — без прокрутки вниз
+  let tab: 'info' | 'skins' = 'info';
   const render = (upgraded = false) => {
     const has = ownsHero(s, heroId);
     const hp = heroProgress(s, heroId);
@@ -65,7 +69,7 @@ export function heroDetail(app: App, heroId: string) {
     const prev = upgraded ? heroStatsAt(heroId, hp.level - 1) : null;
     const cost = upgradeCost(hp.level);
     const skins = skinsOf(heroId);
-    const skinList = h('div.skin-list', ...skins.map((sk) => {
+    const skinList = h('div.skin-list.hscroll', ...skins.map((sk) => {
       const owned = ownsSkin(s, heroId, sk.id);
       const active = hp.skin === sk.id || (!ownsSkin(s, heroId, hp.skin) && sk.id === 'default');
       let action: HTMLElement;
@@ -110,22 +114,31 @@ export function heroDetail(app: App, heroId: string) {
         ...left,
       ),
       h('div.hd-right',
-        h('p.hd-desc', d.description),
-        h('div.stats',
-          statRow('❤️ Здоровье', prev ? prev.hp : st.hp, prev ? st.hp : undefined),
-          statRow('⚔️ ' + d.attackName, prev ? prev.damage : st.damage, prev ? st.damage : undefined),
-          statRow('⭐ ' + d.superName, prev ? prev.superDamage : st.superDamage, prev ? st.superDamage : undefined),
-          statRow('🔄 Перезарядка', d.stats.reload + ' с'),
+        h('div.hd-tabs',
+          btn('📊 Герой', () => { tab = 'info'; sfx('tab'); refresh(); }, tab === 'info' ? 'btn-yellow' : 'btn-gray', { class: 'btn-xs' }),
+          btn(`👕 Скины (${skins.length})`, () => { tab = 'skins'; sfx('tab'); refresh(); }, tab === 'skins' ? 'btn-yellow' : 'btn-gray', { class: 'btn-xs' }),
         ),
-        h('div.abil', h('b', '⚔️ ' + d.attackName + ': '), d.attackDesc),
-        h('div.abil', h('b', '⭐ ' + d.superName + ': '), d.superDesc),
-        h('div.abil.small', `Каждый уровень: +8% к здоровью и урону. Максимум — ${ECONOMY.maxLevel}.`),
-        h('h3.t', 'Скины'),
-        skinList,
+        tab === 'info' ? h('div.hd-info',
+          h('p.hd-desc', d.description),
+          h('div.stats',
+            statRow('❤️ Здоровье', prev ? prev.hp : st.hp, prev ? st.hp : undefined),
+            statRow('⚔️ ' + d.attackName, prev ? prev.damage : st.damage, prev ? st.damage : undefined),
+            statRow('⭐ ' + d.superName, prev ? prev.superDamage : st.superDamage, prev ? st.superDamage : undefined),
+            statRow('🔄 Перезарядка', d.stats.reload + ' с'),
+          ),
+          h('div.abil', h('b', '⚔️ ' + d.attackName + ': '), d.attackDesc),
+          h('div.abil', h('b', '⭐ ' + d.superName + ': '), d.superDesc),
+          h('div.abil.small', `Каждый уровень: +8% к здоровью и урону. Максимум — ${ECONOMY.maxLevel}.`),
+        ) : skinList,
       ),
     );
   };
   const wrap = h('div', render());
-  const refresh = (upgraded = false) => { wrap.innerHTML = ''; wrap.appendChild(render(upgraded)); };
+  const refresh = (upgraded = false) => {
+    wrap.innerHTML = '';
+    wrap.appendChild(render(upgraded));
+    const list = wrap.querySelector('.skin-list') as HTMLElement | null;
+    if (list) enableDragScroll(list);
+  };
   close = modal(wrap, { cls: 'wide', onClose: () => app.refresh() });
 }

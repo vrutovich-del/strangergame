@@ -302,7 +302,7 @@ export function dailyDeal(now = new Date()) {
 
 export function questText(q: { id: string; hero: string; target: number }) {
   const t = QUESTS.find((x) => x.id === q.id)!;
-  const heroName = q.hero ? ({ smile: 'Смайлом', bacteria: 'Бактерией', lion: 'Львом' } as Record<string, string>)[q.hero] ?? (hasHero(q.hero) ? getHero(q.hero).name : q.hero) : '';
+  const heroName = q.hero ? ({ smile: 'Смайлом', bacteria: 'Бактерией', lion: 'Львом', stoptime: 'Стоп-Таймом', miner: 'Шахтёром' } as Record<string, string>)[q.hero] ?? (hasHero(q.hero) ? getHero(q.hero).name : q.hero) : '';
   return t.text(q.target, heroName);
 }
 

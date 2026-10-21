@@ -1,6 +1,6 @@
 // Главные настройки игры. Название игры задаётся только здесь.
 export const GAME_NAME = 'Игра странностей';
-export const GAME_VERSION = '1.1.0';
+export const GAME_VERSION = '1.2.0';
 
 /** Префикс ID комнат на публичном брокере PeerJS (чтобы не пересекаться с чужими играми). */
 export const PEER_PREFIX = 'igra-strannostey-v1-';

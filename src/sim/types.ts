@@ -217,6 +217,13 @@ export interface Pickup {
   alive: boolean;
 }
 
+/** Остановка времени (супер Стоп-Тайма): всё, кроме команды team, стоит до until. */
+export interface TimeStop {
+  team: number;
+  until: number;
+  by: number;
+}
+
 /** Безопасная зона (всё снаружи — ядовитое облако). */
 export interface Zone {
   x0: number;
@@ -244,7 +251,9 @@ export type SimEvent =
   | { t: 'dash'; id: number }
   | { t: 'beam'; x: number; y: number; x2: number; y2: number; team: number }
   | { t: 'announce'; text: string; big: boolean }
-  | { t: 'mhit'; id: number; amount: number; x: number; y: number };
+  | { t: 'mhit'; id: number; amount: number; x: number; y: number }
+  /** Время остановлено: все, кроме команды team, замерли на dur секунд. */
+  | { t: 'timestop'; id: number; team: number; dur: number };
 
 export interface ShotOptions {
   angle: number;
@@ -281,6 +290,11 @@ export interface WorldApi {
   damage(target: Fighter | Minion, amount: number, byId: number, sup: boolean, superPerHit: number): void;
   damageTile(tx: number, ty: number, amount: number, sup: boolean): void;
   infect(target: Fighter, by: Fighter, duration: number): void;
+  /** Остановить время: враги, их снаряды и помощники замирают на duration секунд. */
+  stopTime(by: Fighter, duration: number): void;
+  /** Замер ли боец в остановленном времени. */
+  isFrozen(f: Fighter): boolean;
+  timeStop: TimeStop | null;
   emit(e: SimEvent): void;
   findById(id: number): Fighter | undefined;
   minionById(id: number): Minion | undefined;

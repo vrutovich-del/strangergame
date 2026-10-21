@@ -6,7 +6,7 @@ import { Rng } from '../core/rng';
 import { getHero } from '../heroes/registry';
 import { BATTLE } from './rules';
 import type {
-  Fighter, FighterInput, Minion, Pickup, PlayerSlot, Projectile, ShotOptions, SimEvent, WorldApi, Zone,
+  Fighter, FighterInput, Minion, Pickup, PlayerSlot, Projectile, ShotOptions, SimEvent, TimeStop, WorldApi, Zone,
 } from './types';
 
 export const levelMul = (level: number) => 1 + BATTLE.levelBonus * (level - 1);
@@ -22,6 +22,8 @@ export class World implements WorldApi {
   pickups: Pickup[] = [];
   events: SimEvent[] = [];
   zone: Zone | null = null;
+  /** Остановленное время (супер Стоп-Тайма). */
+  timeStop: TimeStop | null = null;
   private nextId = 1;
   private timers: { at: number; fn: () => void }[] = [];
   /** Ловушки режима (их задаёт режим при запуске). */
@@ -42,6 +44,24 @@ export class World implements WorldApi {
   findById(id: number) { return this.fighters.find((f) => f.id === id); }
   minionById(id: number) { return this.minions.find((m) => m.id === id); }
   enemiesOf(team: number) { return this.fighters.filter((f) => f.alive && this.effTeam(f) !== team); }
+
+  /** Идёт ли остановка времени. */
+  get timeStopped() { return !!this.timeStop && this.time < this.timeStop.until; }
+  /** Замер ли боец: время остановлено, а он не из команды того, кто его остановил. */
+  isFrozen(f: Fighter) { return this.timeStopped && this.effTeam(f) !== this.timeStop!.team; }
+
+  /** Остановить время: враги не ходят и не стреляют, их снаряды и помощники висят в воздухе. */
+  stopTime(by: Fighter, duration: number) {
+    const team = this.effTeam(by);
+    const until = this.time + duration;
+    this.timeStop = { team, until: Math.max(until, this.timeStopped ? this.timeStop!.until : 0), by: by.id };
+    for (const o of this.fighters) {
+      if (!o.alive || this.effTeam(o) === team) continue;
+      o.stunUntil = Math.max(o.stunUntil, until);
+      o.dash = null; o.knock = null;
+    }
+    this.emit({ t: 'timestop', id: by.id, team, dur: duration });
+  }
 
   /** Видит ли команда бойца (кусты прячут). */
   isVisibleTo(f: Fighter, team: number) {
@@ -120,15 +140,20 @@ export class World implements WorldApi {
       f.infectedUntil = 0;
       this.emit({ t: 'cure', id: f.id });
     }
+    const frozen = this.isFrozen(f);
+    // во время остановки времени замершие не перезаряжаются и не лечатся,
+    // а команда того, кто остановил время, перезаряжается вдвое быстрее
+    const reloadMul = frozen ? 0 : this.timeStopped ? 2 : 1;
     // перезарядка
-    if (f.ammo < BATTLE.maxAmmo) f.ammo = Math.min(BATTLE.maxAmmo, f.ammo + dt / def.stats.reload);
+    if (f.ammo < BATTLE.maxAmmo) f.ammo = Math.min(BATTLE.maxAmmo, f.ammo + (dt / def.stats.reload) * reloadMul);
     // лечение
-    if (this.time - f.lastHurt >= BATTLE.healDelay && this.time - f.lastShot >= BATTLE.healDelay && f.hp < f.maxHp) {
+    if (!frozen && this.time - f.lastHurt >= BATTLE.healDelay && this.time - f.lastShot >= BATTLE.healDelay && f.hp < f.maxHp) {
       f.hp = Math.min(f.maxHp, f.hp + f.maxHp * BATTLE.healPerSec * dt);
     }
     // прыжок / оглушение / рывок / отбрасывание
     let forced = false;
-    if (f.leap) {
+    if (frozen) forced = true;
+    else if (f.leap) {
       const L = f.leap;
       const k = Math.min(1, (this.time - L.t0) / Math.max(1e-6, L.t1 - L.t0));
       f.x = L.x0 + (L.x1 - L.x0) * k; f.y = L.y0 + (L.y1 - L.y0) * k;
@@ -174,6 +199,7 @@ export class World implements WorldApi {
         def.attack(this, f, a);
       }
     } else if (!forced) f.moving = false;
+    if (frozen) f.moving = false;
     f.vx = (f.x - f.px) / dt; f.vy = (f.y - f.py) / dt;
     f.inBush = this.map.isBushAt(f.x, f.y);
   }
@@ -276,8 +302,11 @@ export class World implements WorldApi {
 
   private updateProjectiles() {
     const dt = this.dt;
+    const stop = this.timeStopped ? this.timeStop!.team : -99;
     for (const p of this.projectiles) {
       if (!p.alive) continue;
+      // остановленное время: чужие снаряды висят в воздухе
+      if (stop !== -99 && p.team !== stop) continue;
       const speed = Math.hypot(p.vx, p.vy);
       const stepLen = speed * dt;
       const sub = Math.max(1, Math.ceil(stepLen / 0.15));
@@ -387,6 +416,7 @@ export class World implements WorldApi {
   private updateMinions() {
     for (const m of this.minions) {
       if (!m.alive) continue;
+      if (this.timeStopped && m.team !== this.timeStop!.team) { m.expiresAt += this.dt; continue; }
       if (this.time >= m.expiresAt) { this.killMinion(m); continue; }
       getHero(m.heroId).updateMinion?.(this, m);
     }

@@ -171,3 +171,54 @@ export function waterTexture() {
     return t;
   });
 }
+
+/** Шар времени Стоп-Тайма: светящийся шарик с маленьким циферблатом. */
+export function timeballTexture(color = 0x9f8cff) {
+  return cached(`timeball:${color}`, () => canvasTexture(128, (g, s) => {
+    const c = s / 2, r = s * 0.3;
+    const glow = g.createRadialGradient(c, c, r * 0.6, c, c, s / 2);
+    glow.addColorStop(0, hexStr(color) + 'cc'); glow.addColorStop(1, hexStr(color) + '00');
+    g.fillStyle = glow; g.fillRect(0, 0, s, s);
+    g.fillStyle = '#1e1238';
+    g.beginPath(); g.arc(c, c, r + 5, 0, Math.PI * 2); g.fill();
+    const grd = g.createRadialGradient(c - r * 0.3, c - r * 0.35, r * 0.1, c, c, r);
+    grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.45, shade(color, 1.3)); grd.addColorStop(1, shade(color, 0.7));
+    g.fillStyle = grd;
+    g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.fill();
+    // деления и стрелки
+    g.strokeStyle = '#1e1238'; g.lineCap = 'round';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2, k = i % 3 === 0 ? 0.68 : 0.78;
+      g.lineWidth = i % 3 === 0 ? 4 : 2.5;
+      g.beginPath(); g.moveTo(c + Math.sin(a) * r * k, c - Math.cos(a) * r * k); g.lineTo(c + Math.sin(a) * r * 0.9, c - Math.cos(a) * r * 0.9); g.stroke();
+    }
+    g.lineWidth = 5;
+    g.beginPath(); g.moveTo(c, c); g.lineTo(c, c - r * 0.6); g.stroke();
+    g.lineWidth = 4;
+    g.beginPath(); g.moveTo(c, c); g.lineTo(c + r * 0.42, c + r * 0.12); g.stroke();
+    g.fillStyle = '#ff5a8a';
+    g.beginPath(); g.arc(c, c, 5, 0, Math.PI * 2); g.fill();
+  }));
+}
+
+/** Кирка Шахтёра (крутится в полёте). */
+export function pickaxeTexture(color = 0xb0b8c8) {
+  return cached(`pickaxe:${color}`, () => canvasTexture(128, (g, s) => {
+    const c = s / 2;
+    g.translate(c, c);
+    g.rotate(-0.5);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    // ручка
+    g.strokeStyle = '#24120a'; g.lineWidth = 14;
+    g.beginPath(); g.moveTo(0, -s * 0.28); g.lineTo(0, s * 0.4); g.stroke();
+    g.strokeStyle = '#c08a48'; g.lineWidth = 8;
+    g.beginPath(); g.moveTo(0, -s * 0.26); g.lineTo(0, s * 0.38); g.stroke();
+    // железный клюв дугой
+    g.strokeStyle = '#24120a'; g.lineWidth = 17;
+    g.beginPath(); g.arc(0, s * 0.02, s * 0.34, -Math.PI * 0.86, -Math.PI * 0.14); g.stroke();
+    g.strokeStyle = hexStr(color); g.lineWidth = 10;
+    g.beginPath(); g.arc(0, s * 0.02, s * 0.34, -Math.PI * 0.85, -Math.PI * 0.15); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(0, s * 0.02, s * 0.355, -Math.PI * 0.7, -Math.PI * 0.4); g.stroke();
+  }));
+}

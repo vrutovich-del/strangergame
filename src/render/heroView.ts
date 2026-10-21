@@ -27,6 +27,8 @@ export interface AnimState {
 
 export interface Rig {
   bone(name: string): THREE.Object3D | undefined;
+  /** Скин модели: у скинов бывают свои детали и свои анимации. */
+  skinId: string;
   /** Корень модели (масштабированный). */
   body: THREE.Object3D;
   /** Базовый масштаб модели. */

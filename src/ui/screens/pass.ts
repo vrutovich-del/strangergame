@@ -44,9 +44,8 @@ export function passScreen(app: App): Screen {
   const days = Math.floor(left / 86400000), hours = Math.floor((left % 86400000) / 3600000);
   const xpIn = s.pass.xp - tier * ECONOMY.pass.xpPerTier;
   const head = h('div.pass-head',
-    h('div.ph-season.t', `Сезон ${season}`),
-    h('div.ph-timer', `⏳ До конца: ${days} д ${hours} ч`),
-    h('div.ph-xp', h('span.t', `Уровень ${tier}/${ECONOMY.pass.tiers}`), tier < ECONOMY.pass.tiers ? h('div.xp-bar', h('div.xp-fill', { style: { width: `${(xpIn / ECONOMY.pass.xpPerTier) * 100}%` } }), h('span.xp-text', `${xpIn} / ${ECONOMY.pass.xpPerTier} ⭐`)) : h('span', ' Максимум!')),
+    h('div.ph-timer', h('b.t', `Сезон ${season}`), ` · ⏳ ещё ${days} д ${hours} ч`),
+    h('div.ph-xp', h('span.t', `Ур. ${tier}/${ECONOMY.pass.tiers}`), tier < ECONOMY.pass.tiers ? h('div.xp-bar', h('div.xp-fill', { style: { width: `${(xpIn / ECONOMY.pass.xpPerTier) * 100}%` } }), h('span.xp-text', `${xpIn} / ${ECONOMY.pass.xpPerTier} ⭐`)) : h('span', ' Максимум!')),
     s.pass.premium ? h('div.prem-on.t', '👑 Премиум открыт') : btn(['👑 Премиум за ', h('span', '💎 ' + ECONOMY.pass.premiumPrice)], () => {
       if (s.gems < ECONOMY.pass.premiumPrice) { toast('Не хватает кристаллов', 'bad'); return; }
       confirmBox('Открыть премиум?', `Премиум-линия наград за ${ECONOMY.pass.premiumPrice} кристаллов. В конце — эксклюзивный скин!`, 'Открыть', () => {

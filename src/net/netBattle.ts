@@ -272,7 +272,10 @@ export class ClientSource implements BattleSource {
     this.applyInterpolation();
     const out: SimEvent[] = [];
     while (this.queue.length && this.queue[0].tm <= this.renderTime + 0.02) out.push(this.queue.shift()!.e);
-    for (const e of out) if (e.t === 'tile') this.world.map.set(e.tx, e.ty, e.to);
+    for (const e of out) {
+      if (e.t === 'tile') this.world.map.set(e.tx, e.ty, e.to);
+      else if (e.t === 'timestop') this.world.timeStop = { team: e.team, until: this.world.time + e.dur, by: e.id };
+    }
     return out;
   }
 

@@ -3,15 +3,92 @@ import * as THREE from 'three';
 import { autoBlink, blink, blinkOne, look } from '../../render/faceKit';
 import type { HeroView } from '../../render/heroView';
 import { ease } from '../../render/heroView';
-import { group, mesh, toon } from '../../render/kit';
+import { attachAt, group, matKit, mesh, roundedBox, toon } from '../../render/kit';
 import type { SkinDef } from '../skinTypes';
 // @ts-ignore — модель автора на JavaScript
 import { createSmiley, SMILEY_RIG_NAMES } from './model.js';
 
 const JOINTS = (Object.values(SMILEY_RIG_NAMES) as (string | string[])[]).flat();
+/** Яйцо-тело Смайла (в координатах модели): центр и радиусы. */
+const EGG = { y: 1.0, rx: 0.62, ry: 0.7, rz: 0.58 };
+const hide = (o: THREE.Object3D | undefined | null) => { if (o) o.scale.setScalar(0.0001); };
+
+/** Сюрикен: две скрещённые пластинки с дыркой посередине. */
+function shuriken(M: ReturnType<typeof matKit>, parent: THREE.Object3D) {
+  const g = group('shuriken', parent);
+  for (const a of [0, Math.PI / 4]) mesh(roundedBox(0.2, 0.06, 0.02, 0.01), M(0xc8d0e0), 'shuriken_blade', g, [0, 0, 0], [0, 0, a]);
+  for (const a of [0, Math.PI / 4]) mesh(roundedBox(0.06, 0.2, 0.02, 0.01), M(0xc8d0e0), 'shuriken_blade', g, [0, 0, 0], [0, 0, a]);
+  mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10).rotateX(Math.PI / 2), M(0x2b2b33), 'shuriken_hole', g);
+  return g;
+}
+
+/** Ниндзя: чёрный капюшон, красная повязка с хвостами, катана за спиной, сюрикены на поясе. */
+function ninja(m: THREE.Object3D) {
+  const M = matKit('ninja');
+  const torso = m.getObjectByName('torso')!;
+  hide(m.getObjectByName('cap'));
+  for (let i = 1; i <= 3; i++) hide(m.getObjectByName('grenade_' + i));
+  const black = M(0x1c1c28), red = M(0xe8323e);
+  // капюшон закрывает макушку до бровей
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 14, 0, Math.PI * 2, 0, Math.PI * 0.29), black);
+  hood.name = 'ninja_hood';
+  hood.scale.set(EGG.rx + 0.025, EGG.ry + 0.025, EGG.rz + 0.025);
+  attachAt(m, torso, hood, [0, EGG.y, 0]);
+  // повязка вокруг головы
+  const k = Math.sqrt(1 - (0.42 / EGG.ry) ** 2);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(1, 0.075, 8, 48).rotateX(Math.PI / 2), red);
+  band.name = 'ninja_band';
+  band.scale.set(EGG.rx * k + 0.02, 0.85, EGG.rz * k + 0.02);
+  attachAt(m, torso, band, [0, EGG.y + 0.42, 0]);
+  const knot = group('band_tails', m);
+  attachAt(m, torso, knot, [0, EGG.y + 0.42, -EGG.rz * k - 0.03]);
+  mesh(new THREE.SphereGeometry(0.07, 10, 8), red, 'band_knot', knot);
+  for (const s of [1, -1]) mesh(roundedBox(0.08, 0.45, 0.02, 0.01), red, 'band_tail', knot, [0.06 * s, -0.2, -0.03], [0.3, 0, 0.25 * s]);
+  // катана за спиной: рукоять торчит над правым плечом
+  const katana = group('katana', m);
+  attachAt(m, torso, katana, [-0.1, 0.95, -EGG.rz - 0.04], [0, 0, 0.75]);
+  mesh(roundedBox(0.075, 1.0, 0.05, 0.02), black, 'katana_sheath', katana, [0, -0.1, 0]);
+  mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.025, 14), M(0xffc933), 'katana_guard', katana, [0, 0.42, 0]);
+  mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.26, 8), red, 'katana_grip', katana, [0, 0.56, 0]);
+  // сюрикены на поясе вместо гранат
+  for (const [x, z] of [[0.3, 0.42], [-0.34, 0.38]]) {
+    const sh = shuriken(M, m);
+    attachAt(m, torso, sh, [x, 0.5, z], [0, x > 0 ? 0.5 : -0.5, 0.3]);
+  }
+}
+
+/** Робот: антенна с лампочкой, болты по бокам, шов по корпусу и панель с огоньками. */
+function robo(m: THREE.Object3D) {
+  const M = matKit('robo');
+  const torso = m.getObjectByName('torso')!;
+  hide(m.getObjectByName('cap'));
+  const dark = M(0x4a5468), metal = M(0xc8d0de);
+  const ant = group('antenna', m);
+  attachAt(m, torso, ant, [0, EGG.y + EGG.ry - 0.02, 0]);
+  mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.3, 8), dark, 'antenna_rod', ant, [0, 0.15, 0]);
+  mesh(new THREE.SphereGeometry(0.085, 14, 10), M(0xff4b55, { emissive: 0xff2030, ei: 1 }), 'antenna_light', ant, [0, 0.33, 0]);
+  for (const s of [1, -1]) {
+    const b = group('bolt', m);
+    attachAt(m, torso, b, [(EGG.rx - 0.02) * s, EGG.y + 0.05, 0], [0, 0, (Math.PI / 2) * s]);
+    mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.09, 12), metal, 'bolt_head', b, [0, 0.03, 0]);
+    mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 6), dark, 'bolt_nut', b, [0, 0.09, 0]);
+  }
+  // шов по корпусу — между ртом и глазами
+  const seam = new THREE.Mesh(new THREE.TorusGeometry(1, 0.02, 6, 48).rotateX(Math.PI / 2), dark);
+  seam.name = 'robo_seam';
+  seam.scale.set(EGG.rx + 0.006, 1, EGG.rz + 0.006);
+  attachAt(m, torso, seam, [0, EGG.y, 0]);
+  // панель на груди с тремя огоньками
+  const panel = group('robo_panel', m);
+  attachAt(m, torso, panel, [0.02, 0.5, 0.55], [-0.15, 0, 0]);
+  mesh(roundedBox(0.36, 0.16, 0.05, 0.03), dark, 'panel_plate', panel);
+  [0x5ee05a, 0xffd23f, 0x3fd8ff].forEach((c, i) => mesh(new THREE.SphereGeometry(0.035, 10, 8), M(c, { emissive: c, ei: 1 }), 'panel_light', panel, [(i - 1) * 0.1, 0, 0.03]));
+}
 
 function decorate(m: THREE.Object3D, skin: SkinDef) {
   const torso = m.getObjectByName('torso')!;
+  if (skin.id === 'ninja') ninja(m);
+  if (skin.id === 'robo') robo(m);
   if (skin.id === 'cosmo') {
     // шлем космонавта: стеклянный пузырь, воротник и антенна; кепку снимаем
     const cap = m.getObjectByName('cap');
@@ -38,7 +115,7 @@ function decorate(m: THREE.Object3D, skin: SkinDef) {
 
 const view: HeroView = {
   id: 'smile',
-  joints: [...JOINTS, 'helmet'],
+  joints: [...JOINTS, 'helmet', 'band_tails', 'katana', 'antenna'],
   outline: [0x2a1206, 0.012],
   scale: 0.74,
   height: 1.5,
@@ -56,6 +133,8 @@ const view: HeroView = {
     const legL = r.bone('leg_L'), legR = r.bone('leg_R');
     const armL = r.bone('arm_L'), armR = r.bone('arm_R');
     const mouth = r.bone('mouth');
+    const nj = r.skinId === 'ninja', rb = r.skinId === 'robo';
+    const q = (v: number, n: number) => (rb ? Math.round(v * n) / n : v); // робот двигается «рывками»
     // смерть: сдувается, как шарик
     if (s.dead >= 0) {
       const k = Math.min(1, s.dead / 0.7);
@@ -67,14 +146,34 @@ const view: HeroView = {
     }
     // постоянное лёгкое подпрыгивание; на бегу — большие прыжки
     const run = s.move;
-    const hopF = run > 0.1 ? 9 : 4.2;
+    const hopF = run > 0.1 ? (nj ? 11 : 9) : 4.2;
     const hop = Math.abs(Math.sin(t * hopF));
-    body.position.y = hop * (0.04 + run * 0.16);
-    const sq = (1 - hop) * (0.04 + run * 0.08);
-    torso.scale.set(1 + sq, 1 - sq, 1 + sq);
-    torso.rotation.x = run * 0.16;
-    if (legL && legR) { legL.rotation.x = Math.sin(t * hopF) * 0.55 * run; legR.rotation.x = -Math.sin(t * hopF) * 0.55 * run; }
-    if (armL && armR) { armL.rotation.x = -Math.sin(t * hopF) * 0.4 * run; armR.rotation.x = Math.sin(t * hopF) * 0.4 * run; }
+    if (rb) {
+      // робот не подпрыгивает, а шагает, покачиваясь рывками
+      body.position.y = q(hop, 3) * 0.05 * run;
+      torso.rotation.z = q(Math.sin(t * hopF), 2) * 0.07 * run;
+      torso.rotation.x = run * 0.08;
+    } else {
+      body.position.y = hop * (0.04 + run * (nj ? 0.08 : 0.16));
+      const sq = (1 - hop) * (0.04 + run * 0.08);
+      torso.scale.set(1 + sq, 1 - sq, 1 + sq);
+      torso.rotation.x = run * (nj ? 0.42 : 0.16);
+    }
+    if (legL && legR) { legL.rotation.x = q(Math.sin(t * hopF), 2) * 0.55 * run; legR.rotation.x = -q(Math.sin(t * hopF), 2) * 0.55 * run; }
+    if (nj) {
+      // ниндзя бежит, отведя руки назад; в покое — боевая стойка
+      if (armL && armR) { armL.rotation.x = 1.1 * run; armR.rotation.x = 1.1 * run; }
+      body.position.y -= 0.05 * (1 - run);
+      torso.rotation.x += 0.1 * (1 - run);
+      const tails = r.bone('band_tails');
+      if (tails) { tails.rotation.x = -0.4 - run * 0.9 + Math.sin(t * 15) * (0.1 + 0.15 * run); tails.rotation.z = Math.sin(t * 9) * 0.15; }
+    } else if (armL && armR) { armL.rotation.x = -q(Math.sin(t * hopF), 2) * 0.4 * run; armR.rotation.x = q(Math.sin(t * hopF), 2) * 0.4 * run; }
+    if (rb) {
+      // антенна качается, лампочка мигает при выстреле; в покое голова «сканирует»
+      const ant = r.bone('antenna');
+      if (ant) ant.rotation.z = Math.sin(t * 6) * 0.15 + Math.sin(t * hopF) * 0.2 * run;
+      if (run < 0.05) body.rotation.y = q(Math.sin(t * 0.8), 2) * 0.25;
+    }
     // гранаты-смайлики качаются, а когда помощники вылетели — на ремне их нет
     for (let i = 1; i <= 3; i++) {
       const g = r.bone('grenade_' + i);
@@ -83,6 +182,8 @@ const view: HeroView = {
       else { g.rotation.x = Math.sin(t * hopF + i) * 0.25 * (0.3 + run); g.rotation.z = Math.cos(t * 3 + i) * 0.1; }
     }
     let lid = autoBlink(t, 0.37);
+    // ниндзя бросает сюрикены с разворота
+    if (nj && s.shot >= 0 && s.shot < 0.3) body.rotation.y = Math.PI * 2 * ease.out(s.shot / 0.3);
     // выстрел: улыбка шире + отдача рукой
     const shot = ease.pulse(s.shot, 0.3);
     if (mouth) mouth.scale.set(1 + shot * 0.18, 1 + shot * 0.35, 1);
@@ -90,8 +191,10 @@ const view: HeroView = {
     torso.rotation.x -= shot * 0.12;
     // супер: прыжок и руки вверх
     const sup = ease.pulse(s.sup, 0.6);
+    // ниндзя делает сальто назад
+    if (nj && s.sup >= 0 && s.sup < 0.6) torso.rotation.x -= Math.PI * 2 * ease.inOut(s.sup / 0.6);
     if (sup) {
-      body.position.y += sup * 0.5;
+      body.position.y += sup * (nj ? 0.8 : 0.5);
       if (armL) armL.rotation.z += sup * 1.2;
       if (armR) armR.rotation.z -= sup * 1.2;
       if (mouth) mouth.scale.y *= 1 + sup * 0.3;
@@ -107,12 +210,18 @@ const view: HeroView = {
     blink(r, lid);
     look(r, Math.sin(t * 0.7) * 0.3, hurt * 0.6);
     // победа: крутится и подмигивает
-    if (s.win) {
+    if (s.win && rb) {
+      // робот танцует «робота»
+      body.rotation.y = q(Math.sin(t * 2), 2) * 0.6;
+      if (armL) armL.rotation.z += q(Math.sin(t * 4), 1) * 1.2 + 0.6;
+      if (armR) armR.rotation.z -= q(Math.sin(t * 4 + Math.PI), 1) * 1.2 + 0.6;
+      body.position.y = 0;
+    } else if (s.win) {
       body.rotation.y = (t * 4) % (Math.PI * 2);
       body.position.y = Math.abs(Math.sin(t * 6)) * 0.3;
       if (Math.sin(t * 2) > 0.3) blinkOne(r, 'L', 1);
       if (mouth) mouth.scale.set(1.15, 1.3, 1);
-    } else body.rotation.y = 0;
+    }
     if (s.lose) {
       torso.rotation.x = 0.35;
       if (mouth) mouth.scale.set(0.6, 0.6, 1);

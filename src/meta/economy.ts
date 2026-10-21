@@ -122,6 +122,7 @@ export const TROPHY_ROAD: { at: number; reward: Reward | { kind: 'future'; text:
   { at: 100, reward: { kind: 'box', box: 'big' } },
   { at: 150, reward: { kind: 'coins', amount: 150 } },
   { at: 200, reward: { kind: 'gems', amount: 30 } },
+  { at: 250, reward: { kind: 'hero', heroId: 'miner' } },
   { at: 300, reward: { kind: 'skin', heroId: 'bacteria', skinId: 'rainbow' } },
   { at: 400, reward: { kind: 'box', box: 'mega' } },
   { at: 500, reward: { kind: 'gems', amount: 50 } },
@@ -129,6 +130,7 @@ export const TROPHY_ROAD: { at: number; reward: Reward | { kind: 'future'; text:
   { at: 750, reward: { kind: 'coins', amount: 300 } },
   { at: 900, reward: { kind: 'bling', amount: 150 } },
   { at: 1000, reward: { kind: 'box', box: 'mega' } },
+  { at: 1100, reward: { kind: 'hero', heroId: 'stoptime' } },
   { at: 1250, reward: { kind: 'gems', amount: 80 } },
   { at: 1500, reward: { kind: 'box', box: 'mega' } },
 ];

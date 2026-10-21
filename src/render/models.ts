@@ -109,6 +109,7 @@ export function prewarm(list: { heroId: string; skinId: string; team: 'blue' | '
 
 interface MatSlot { mat: THREE.MeshToonMaterial; color: THREE.Color; emissive: THREE.Color; ei: number; tr: boolean; op: number; dw: boolean }
 const GREEN = new THREE.Color(0x5cff45);
+const ICE = new THREE.Color(0xa8c8ff);
 const WHITE = new THREE.Color(0xffffff);
 
 /** Экземпляр персонажа в сцене. */
@@ -125,6 +126,8 @@ export class Character implements Rig {
   private current = '';
   flash = 0;
   green = 0;
+  /** 0…1 — замер в остановленном времени (ледяной оттенок). */
+  frozen = 0;
   ghost = 1;
 
   constructor(public heroId: string, public skinId: string, public team: 'blue' | 'red' | 'orange') {
@@ -182,13 +185,15 @@ export class Character implements Rig {
   /** Вспышка при уроне и зелёный цвет заражения. */
   updateMaterials(dt: number) {
     this.flash = Math.max(0, this.flash - dt * 6);
-    const f = this.flash, g = this.green;
+    const f = this.flash, g = this.green, fr = this.frozen;
     for (const s of this.mats) {
       s.mat.color.copy(s.color);
       if (g > 0) s.mat.color.lerp(GREEN, 0.55 * g);
+      if (fr > 0.01) s.mat.color.lerp(ICE, 0.6 * fr);
       s.mat.emissive.copy(s.emissive);
       s.mat.emissiveIntensity = s.ei;
       if (f > 0) { s.mat.emissive.lerp(WHITE, f); s.mat.emissiveIntensity = Math.max(s.ei, f * 0.9); }
+      else if (fr > 0.01) { s.mat.emissive.lerp(ICE, 0.5 * fr); s.mat.emissiveIntensity = Math.max(s.ei, 0.3 * fr); }
       else if (g > 0) { s.mat.emissive.lerp(GREEN, 0.25 * g); s.mat.emissiveIntensity = Math.max(s.ei, 0.35 * g); }
     }
   }

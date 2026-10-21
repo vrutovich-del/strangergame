@@ -92,10 +92,12 @@ export class Showdown implements ModeRules {
 
   botGoal(m: Match, f: Fighter): BotGoal | null {
     const w = m.world;
-    // пока нет облака, роботы сперва копят кубы и дерутся только с теми, кто рядом
-    let engage = w.time < 25 ? 0 : w.time < R.poisonStart ? 3.5 : w.time < R.poisonStart + 25 ? 6 : 99;
-    // на того, кто напал, отвечают всегда
-    if (w.time - f.lastHurt < 2) engage = Math.max(engage, 5);
+    // пока нет облака, роботы в основном копят кубы, но с теми, кто подошёл близко, дерутся сразу —
+    // иначе все стоят мирно, пока игрок не ударит, а потом разом начинается драка «все на всех»
+    const t = w.time;
+    let engage = t < 8 ? 3.5 : t < 25 ? 5 : t < R.poisonStart ? 6.5 : t < R.poisonStart + 25 ? 8 : 99;
+    // на того, кто напал, отвечают
+    if (t - f.lastHurt < 2) engage = Math.max(engage, 6.5);
     const z = zoneGoal(m, f);
     if (z) return { ...z, engage };
     // кубы рядом

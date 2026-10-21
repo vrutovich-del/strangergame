@@ -164,6 +164,8 @@ export class BattleScreen {
           else if (e.heroId === 'robo_sniper') name = 'laser';
           else if (e.heroId === 'robo_tank') name = e.sup ? 'dash' : 'punch';
           else if (e.heroId === 'lion') name = e.sup ? 'roar' : 'claw';
+          else if (e.heroId === 'stoptime') name = e.sup ? 'clock' : 'throw_ball';
+          else if (e.heroId === 'miner') name = e.sup ? 'dash' : 'pickaxe';
           if (e.sup) sfx('super', { vol, pitch });
           sfx(name, { vol, pitch: e.sup && e.heroId === 'bacteria' ? pitch * 0.6 : pitch });
           if (e.id === this.src.localId && e.sup) audio.vibrate(40);
@@ -174,7 +176,7 @@ export class BattleScreen {
           break;
         case 'death': {
           const f = w.findById(e.id);
-          const n: SfxName = f?.heroId === 'smile' ? 'deflate' : f?.heroId === 'bacteria' ? 'splat' : f?.heroId === 'lion' ? 'roar' : 'death';
+          const n: SfxName = f?.heroId === 'smile' ? 'deflate' : f?.heroId === 'bacteria' ? 'splat' : f?.heroId === 'lion' ? 'roar' : f?.heroId === 'stoptime' ? 'spring' : 'death';
           sfx(n, { vol: att(e.x, e.y), pitch: n === 'roar' ? 0.7 : 1 });
           if (e.id === this.src.localId) audio.vibrate([60, 40, 60]);
           break;
@@ -182,7 +184,8 @@ export class BattleScreen {
         case 'tile': sfx('crate', { vol: att(e.tx, e.ty) }); break;
         case 'impact':
           if (e.kind === 'claw_hit') sfx('claw', { vol: att(e.x, e.y), pitch: 0.9 + Math.random() * 0.2 });
-          else if (e.kind === 'lion_slam') { sfx('slam', { vol: att(e.x, e.y) }); if (this.near(e.x, e.y)) audio.vibrate(50); }
+          else if (e.kind === 'lion_slam' || e.kind === 'miner_slam') { sfx('slam', { vol: att(e.x, e.y) }); if (this.near(e.x, e.y)) audio.vibrate(50); }
+          else if (e.kind === 'pickaxe') sfx('clink', { vol: att(e.x, e.y) });
           break;
         case 'pickup': if (e.id === this.src.localId) sfx(e.kind === 'gem' ? 'gem' : 'cube'); else sfx(e.kind === 'gem' ? 'gem' : 'cube', { vol: att(e.x, e.y) * 0.5 }); break;
         case 'infect': sfx('infect', { vol: att(0, 0) }); break;
@@ -192,6 +195,7 @@ export class BattleScreen {
         case 'announce': sfx('announce'); this.hud.showAnnounce(e.text); break;
         case 'spawn': if (e.id === this.src.localId && w.time > 1) sfx('respawn'); break;
         case 'emote': sfx('emote', { vol: 0.6 }); break;
+        case 'timestop': sfx('timestop'); audio.vibrate([30, 30, 30]); break;
         case 'gem': sfx('tick', { vol: 0.3 }); break;
       }
     }
@@ -234,9 +238,11 @@ export class BattleScreen {
     } else this.view.setAim(null, w);
     const hud = src.hud();
     this.view.setMark(hud.markX >= 0 ? { x: hud.markX, y: hud.markY } : null);
+    const ts = w.timeStopped ? w.timeStop! : null;
     this.hud.update(hud, {
       ammo: me?.ammo ?? 0, superCharge: me?.superCharge ?? 0, alive: !!me?.alive, respawnIn: src.respawnIn(),
       infected: !!me && w.time < me.infectedUntil, heroColor: '#ffd23f',
+      timeStop: ts ? ts.until - w.time : 0, timeStopMine: !!ts && !!me && w.effTeam(me) === ts.team,
     }, src.localTeam);
     if (me && me.superCharge >= 1 && !this.superReadyShown) this.superReadyShown = true;
     if (me && me.superCharge < 1) this.superReadyShown = false;

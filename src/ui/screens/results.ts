@@ -25,7 +25,8 @@ export function resultsScreen(app: App, res: MatchResult, src: BattleSource, r: 
   else if (r?.won === false) { title = 'ПОРАЖЕНИЕ'; cls = 'lose'; }
   else { title = 'НИЧЬЯ'; cls = 'draw'; }
   if (me) app.showHero(me.heroId, me.skinId, cls === 'win' ? 'win' : cls === 'lose' ? 'lose' : 'idle');
-  app.showcase.offsetX = -0.9;
+  // на телефоне колонка с наградами шире — героя ставим правее
+  app.showcase.offsetX = innerHeight <= 500 ? -1.35 : -0.9;
   sfx(cls === 'win' ? 'win' : cls === 'lose' ? 'lose' : 'announce');
 
   const row = (icon: string, label: string, value: number, plus = true) => {
@@ -40,7 +41,7 @@ export function resultsScreen(app: App, res: MatchResult, src: BattleSource, r: 
     rows.append(row('⭐', 'Очки пропуска', r.xp));
     if (r.bling) rows.append(row('✨', 'Первая победа дня!', r.bling));
     if (r.tierAfter > r.tierBefore) rows.append(h('div.rr.highlight.t', `🎟️ Новый уровень пропуска: ${r.tierAfter}!`));
-    for (const i of r.questsDone) rows.append(h('div.rr.highlight', '📜 Задание выполнено: ' + questText(s.quests.list[i])));
+    for (const i of r.questsDone) rows.append(h('div.rr.highlight.quest-row', { title: 'Задание выполнено' }, '📜 ✔ ' + questText(s.quests.list[i])));
   }
   if (hostLeft) rows.append(h('div.rr', 'Награды за победу не выдаются, но и трофеи не отняли.'));
   const trophyLine = h('div.res-total.t', `🏆 ${r ? r.trophiesBefore : totalTrophies(s)}`);

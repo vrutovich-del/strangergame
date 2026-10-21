@@ -257,6 +257,36 @@ class AudioEngine {
       case 'respawn':
         this.tone({ type: 'sine', f0: 400, f1: 1200, dur: 0.3, vol: 0.1 * v });
         break;
+      case 'throw_ball':
+        if (!this.gate(name, 0.05)) return;
+        this.tone({ type: 'sine', f0: 700 * p, f1: 1400 * p, dur: 0.12, vol: 0.12 * v });
+        this.tone({ type: 'triangle', f0: 1900 * p, f1: 2400 * p, dur: 0.08, vol: 0.05 * v, at: T + 0.03 });
+        break;
+      case 'clock':
+        // звон будильника: быстрые удары молоточка по двум колокольчикам
+        for (let i = 0; i < 10; i++) this.tone({ type: 'square', f0: (i % 2 ? 1760 : 1568) * p, dur: 0.05, vol: 0.07 * v, at: T + i * 0.06 });
+        break;
+      case 'timestop':
+        // «тик-так» и низкий гул — время встало
+        this.tone({ type: 'sine', f0: 520, f1: 70, dur: 0.9, vol: 0.2 * v });
+        this.noise({ dur: 0.6, vol: 0.14 * v, type: 'bandpass', f0: 3000, f1: 300, q: 0.9 });
+        [0.35, 0.75, 1.15, 1.55].forEach((d, i) => this.tone({ type: 'square', f0: i % 2 ? 1200 : 900, dur: 0.03, vol: 0.09 * v, at: T + d }));
+        break;
+      case 'pickaxe':
+        if (!this.gate(name, 0.05)) return;
+        this.noise({ dur: 0.2, vol: 0.18 * v, type: 'bandpass', f0: 600 * p, f1: 1800 * p, q: 1 });
+        this.tone({ type: 'triangle', f0: 300 * p, f1: 520 * p, dur: 0.14, vol: 0.08 * v });
+        break;
+      case 'clink':
+        if (!this.gate(name, 0.05)) return;
+        this.tone({ type: 'square', f0: 2200 * p, f1: 1800 * p, dur: 0.07, vol: 0.06 * v });
+        this.tone({ type: 'sine', f0: 3300 * p, dur: 0.12, vol: 0.05 * v });
+        break;
+      case 'spring':
+        this.tone({ type: 'sine', f0: 300, f1: 900, dur: 0.12, vol: 0.14 * v });
+        this.tone({ type: 'sine', f0: 900, f1: 200, dur: 0.4, vol: 0.12 * v, at: T + 0.12 });
+        this.noise({ dur: 0.3, vol: 0.12 * v, f0: 2400, f1: 400, at: T + 0.1 });
+        break;
     }
   }
 
@@ -269,7 +299,8 @@ export type SfxName =
   | 'shoot_smile' | 'shoot_germ' | 'shoot_robot' | 'laser' | 'punch' | 'hit' | 'hurt' | 'death' | 'deflate' | 'splat'
   | 'super' | 'super_ready' | 'gem' | 'cube' | 'crate' | 'pop' | 'helpers' | 'sneeze' | 'infect' | 'dash'
   | 'click' | 'tab' | 'coin' | 'buy' | 'levelup' | 'win' | 'lose' | 'tick' | 'countdown' | 'go' | 'emote'
-  | 'box_shake' | 'box_open' | 'reward' | 'whoosh' | 'announce' | 'respawn' | 'claw' | 'roar' | 'slam' | 'drop';
+  | 'box_shake' | 'box_open' | 'reward' | 'whoosh' | 'announce' | 'respawn' | 'claw' | 'roar' | 'slam' | 'drop'
+  | 'throw_ball' | 'clock' | 'timestop' | 'pickaxe' | 'clink' | 'spring';
 
 export const audio = new AudioEngine();
 export const sfx = (name: SfxName, o?: { pitch?: number; vol?: number }) => audio.play(name, o);

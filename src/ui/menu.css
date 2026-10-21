@@ -35,7 +35,7 @@
 .lobby-left { left: calc(14px + var(--sal)); } .lobby-right { right: calc(14px + var(--sar)); }
 .btn-side { background: linear-gradient(#6c56d8, #4231a0); flex-direction: column; width: 92px; height: 86px; padding: 4px; gap: 0; }
 .sb-ico { font-size: 36px; line-height: 1.1; text-shadow: none; } .sb-label { font-size: 16px; }
-.lobby-settings { position: absolute; right: calc(14px + var(--sar)); bottom: calc(14px + var(--sab)); z-index: 2; }
+.tb-right .lobby-settings { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; font-size: 22px; border-radius: 12px; }
 .hero-tag { position: absolute; left: 50%; bottom: calc(150px + var(--sab)); transform: translateX(-50%); text-align: center; z-index: 1; cursor: pointer; }
 .ht-name { font-size: 30px; } .ht-row { display: flex; gap: 10px; justify-content: center; align-items: center; } .ht-trophies { font-size: 18px; color: var(--yellow); }
 .ht-role { font-size: 15px; opacity: .85; text-shadow: 0 2px 0 #000; }
@@ -151,7 +151,7 @@
 
 /* ───────── боевой пропуск ───────── */
 .pass-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; margin-bottom: 6px; }
-.ph-season { font-size: 26px; } .ph-timer { font-size: 16px; background: rgba(0,0,0,.3); border-radius: 10px; padding: 4px 10px; }
+.ph-season { font-size: 26px; } .ph-timer { font-size: 16px; background: rgba(0,0,0,.3); border-radius: 10px; padding: 4px 10px; white-space: nowrap; } .ph-timer b { font-weight: 800; color: var(--yellow); }
 .ph-xp { display: flex; align-items: center; gap: 8px; }
 .xp-bar { position: relative; width: 180px; height: 22px; background: #1a0f3a; border: 3px solid var(--ink); border-radius: 10px; overflow: hidden; }
 .xp-fill { height: 100%; background: linear-gradient(#9dff5a, #3fc73a); } .xp-text { position: absolute; inset: 0; font-size: 13px; text-align: center; line-height: 16px; text-shadow: 0 1px 0 #000; }
@@ -338,7 +338,7 @@
 .ios-hint b { font-weight: 800; color: #4a2bb0; }
 
 /* ───────── маленькие экраны (телефон) ───────── */
-@media (max-height: 430px) {
+@media (max-height: 500px) {
   .btn-side { width: 76px; height: 70px; } .sb-ico { font-size: 28px; } .sb-label { font-size: 13px; }
   .lobby-left, .lobby-right { top: calc(70px + var(--sat)); gap: 8px; }
   .btn-play { font-size: 30px; height: 70px; min-width: 190px; }
@@ -360,7 +360,178 @@
   .br-new { font-size: 32px; } .drop-rarity { font-size: 26px; } .hc-rarity { font-size: 13px; }
   .drop-screen { gap: 8px; } .join-box { padding: 4px 10px; font-size: 15px; } .join-box .code-input { height: 40px; font-size: 22px; width: 150px; }
 }
+.tb-left { min-width: 0; flex: 1 1 auto; } .tb-right { flex: none; }
+.tb-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) {
-  .tb-right .cur-val { min-width: 34px; font-size: 17px; }
-  .hero-detail { flex-direction: column; align-items: center; }
+  .topbar { gap: 6px; } .tb-left, .tb-right { gap: 6px; }
+  .tb-title { font-size: 22px; }
+  .cur { height: 38px; padding-left: 4px; } .cur-ico { font-size: 19px; }
+  .tb-right .cur-val { min-width: 30px; font-size: 16px; padding: 0 4px; }
+  .cur-plus { width: 36px; height: 36px; min-width: 36px; min-height: 36px; font-size: 22px; }
+  .tb-right .lobby-settings { width: 40px; height: 40px; min-width: 40px; min-height: 40px; font-size: 20px; }
+  .topbar .btn-icon { width: 52px; height: 52px; min-height: 52px; min-width: 52px; font-size: 22px; }
+  .pc-nick { font-size: 17px; } .pc-trophies { font-size: 14px; } .profile-chip { padding: 3px 10px 3px 3px; gap: 6px; }
+  .modal-back.wide .btn-close { top: 4px; right: 4px; }
+}
+@media (max-height: 500px) {
+  .btn-close { top: -8px; right: -8px; width: 46px; height: 46px; min-width: 46px; min-height: 46px; font-size: 20px; }
+  .modal-back.wide .btn-close { top: 4px; right: 4px; }
+}
+
+/* ───────── телефон боком: всё на одном экране, прокрутка только вбок ───────── */
+.hscroll { min-height: 0; }
+.hero-scroll, .mode-scroll, .panels { display: flex; }
+.hero-row, .mode-row, .panel-row { display: flex; gap: 14px; padding: 6px 6px 4px; height: 100%; align-items: stretch; }
+.hero-row .hero-card { flex: none; width: 190px; min-height: 0; }
+.hero-row .hc-img { flex: 1 1 auto; min-height: 0; width: 100%; height: auto; max-height: 170px; }
+.hero-row .hero-card.soon .soon-q { font-size: 90px; }
+.mode-row { margin: 0 auto; }
+.mode-row .mode-big { flex: none; width: 214px; min-height: 0; }
+.modes-foot { padding: 2px 0; }
+.pick-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; min-height: 0; }
+.pick-line { display: flex; align-items: center; gap: 10px; min-height: 0; }
+.pick-label { width: 96px; flex: none; font-size: 22px; display: flex; flex-direction: column; } .pick-label small { font-size: 12px; opacity: .85; }
+.pick-row { display: flex; gap: 10px; padding: 6px 4px 8px; flex: 1; }
+.pick-row .pick { flex: none; }
+.panel { flex: none; width: 330px; display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,.22); border: 3px solid var(--ink); border-radius: 18px; padding: 10px 12px; overflow: hidden; }
+.panel-title { font-size: 21px; }
+.panel .setting { padding: 4px 10px; min-height: 50px; gap: 8px; }
+.panel > * { flex-shrink: 0; }
+.panel .setting.choice-set { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; padding: 6px 8px; }
+.panel .choice { gap: 5px; } .panel .choice .btn { flex: 1 1 auto; min-height: 36px; font-size: 14px; padding: 3px 8px; }
+.panel .slider { width: 150px; }
+.panel > .btn { align-self: stretch; }
+.panel .avatar-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.panel .avatar-pick { width: auto; height: auto; aspect-ratio: 1; font-size: 28px; }
+.panel .stats { gap: 4px; } .panel .stat { padding: 4px 10px; font-size: 15px; } .panel .st-v { font-size: 16px; }
+.panel .prof-card { gap: 12px; } .panel .prof-card .col { align-items: stretch; }
+.panel .nick-input { width: 180px; }
+.panel .acc-box { padding: 0; background: none; border: none; font-size: 16px; }
+.panel .version { margin-top: auto; }
+.quests-body { flex: 1; display: flex; gap: 14px; min-height: 0; padding: 4px; }
+.quests-col { flex: 1.45; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.login-col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.quest { flex-direction: column; align-items: stretch; gap: 6px; flex-wrap: nowrap; }
+.q-text { min-width: 0; }
+.q-line { display: flex; align-items: center; gap: 10px; }
+.q-bar { flex: 1; width: auto; min-width: 80px; }
+.login-col .login-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.login-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.login-day .reward-card { min-width: 0; width: 100%; }
+.room-body { flex: 1; display: flex; flex-direction: row; gap: 14px; min-height: 0; align-items: stretch; padding: 4px; }
+.room-main { flex: 1.15; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.room-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.room-label { font-size: 18px; }
+.room-side .row, .room-modes { justify-content: flex-start; gap: 6px; }
+.room-side .join-box { flex-direction: row; justify-content: space-between; }
+.room-side .pick-row { flex: none; }
+.room-start { flex: 1; justify-content: center; }
+.hd-right { display: flex; flex-direction: column; min-height: 0; }
+.hd-tabs { display: flex; gap: 8px; margin-bottom: 8px; }
+.skin-list.hscroll { flex-wrap: nowrap; flex: none; padding: 4px 2px 8px; }
+.skin-list .skin-card { flex: none; }
+.wn-list { display: flex; gap: 12px; padding-bottom: 8px; }
+.wn-entry { flex: none; width: min(70vw, 360px); background: rgba(0,0,0,.25); border: 3px solid var(--ink); border-radius: 14px; padding: 8px 12px; }
+.whatsnew ul { margin: 6px 0 0; padding-left: 20px; }
+.acc-fields { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+@media (max-height: 500px) {
+  .hero-row .hero-card { width: 150px; padding: 6px; } .hc-name { font-size: 20px; } .hc-role { font-size: 12px; }
+  .mode-row .mode-big { width: 170px; padding: 10px; } .mb-name { font-size: 20px; } .mb-desc { font-size: 13px; } .mb-short { font-size: 14px; } .mb-icon { font-size: 32px; }
+  .pick img { width: 62px; height: 62px; } .pick { min-width: 84px; padding: 4px 8px; font-size: 14px; } .pick.small img { width: 50px; height: 50px; } .pick.small { min-width: 60px; }
+  .pick-label { width: 78px; font-size: 18px; } .pick-label small { font-size: 10px; }
+  .panel { width: 290px; padding: 8px 10px; gap: 6px; } .panel-title { font-size: 17px; }
+  .panel .setting { min-height: 42px; padding: 3px 8px; } .set-l { font-size: 16px; } .panel .slider { width: 130px; height: 32px; }
+  .panel .setting > .btn-sm { min-height: 38px; padding: 2px 14px; font-size: 16px; }
+  .panel .avatar.big { width: 64px; height: 64px; font-size: 40px; } .panel .nick-input { width: 160px; height: 44px; font-size: 20px; }
+  .panel .avatar-pick { font-size: 24px; border-radius: 10px; } .panel .stat { padding: 2px 8px; font-size: 13px; } .panel .st-v { font-size: 14px; }
+  .panel .stats { display: flex; flex-direction: column; }
+  .panel .acc-box { font-size: 14px; } .panel .small { font-size: 13px; }
+  .quest { padding: 4px 10px; gap: 3px; } .q-text { font-size: 15px; } .q-bar { height: 22px; } .q-num { line-height: 16px; font-size: 13px; } .quest-list { gap: 6px; }
+  .quest .reward-card, .pass-cell .reward-card { flex-direction: row; gap: 4px; padding: 2px 6px; min-width: 0; }
+  .quest .rc-icon { font-size: 18px; } .quest .rc-text { font-size: 13px; } .q-xp { font-size: 12px; } .quest .btn-sm { min-height: 36px; font-size: 15px; padding: 2px 10px; }
+  .login-days { gap: 5px; } .login-day { padding: 3px 2px; gap: 2px; } .login-day .rc-icon { font-size: 20px; } .login-day .rc-text { font-size: 11px; } .ld-n { font-size: 11px; }
+  .login-col .btn-sm { min-height: 40px; }
+  .modal-back.wide { padding: 6px; } .modal-back.wide .modal { padding: 8px 12px; } .modal-back.wide .modal-inner { max-height: calc(100vh - 32px); }
+  .hd-img { width: 104px; height: 104px; } .hd-name { font-size: 24px; } .hd-left { min-width: 150px; gap: 5px; } .hd-left .btn { min-height: 42px; font-size: 16px; padding: 4px 12px; }
+  .hd-lvl .lvl-badge.big { font-size: 16px; } .hd-how { padding: 4px 8px; } .hd-way { font-size: 13px; } .hd-locked { font-size: 17px; }
+  .hd-desc { font-size: 14px !important; margin: 0 0 6px !important; } .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .stat { padding: 3px 8px; font-size: 13px; gap: 6px; } .st-v, .st-up { font-size: 14px; } .abil { font-size: 13px; margin: 4px 0; }
+  .skin-card { width: 112px; } .skin-card img { width: 72px; height: 72px; } .sk-name { font-size: 13px; min-height: 30px; } .sk-tag { min-height: 40px; font-size: 13px; } .skin-card .btn-sm { min-height: 38px; font-size: 15px; }
+  .pass-head .btn-sm { min-height: 40px; font-size: 16px; } .ph-timer { font-size: 13px; padding: 2px 8px; } .xp-bar { width: 120px; }
+  .pass-tier { width: 30px; height: 30px; font-size: 14px; } .pass-col { gap: 5px; } .pass-row { gap: 8px; }
+  .pass-cell { width: 96px; padding: 3px; gap: 2px; } .pass-cell .rc-icon { font-size: 18px; } .pass-cell .rc-text { font-size: 12px; max-width: 64px; }
+  .pass-skin { width: 40px; height: 40px; } .pass-cell .btn-xs { min-height: 30px; font-size: 13px; padding: 2px 8px; } .pass-cell .locked-tag { font-size: 16px; min-height: 18px; }
+  .pass .shop-note { display: none; } .pass-labels { padding-top: 34px; width: 70px; }
+  .room-code { font-size: 30px; letter-spacing: 5px; } .room-slots { gap: 8px; } .room-slot { width: 112px; } .room-label { font-size: 15px; } .room-note { display: none; }
+  .room-side .join-box .code-input { width: 120px; }
+  .room-side .pick img { width: 48px; height: 48px; } .room-side .pick { min-width: 70px; font-size: 12px; padding: 3px 6px; } .room-side .pick.small img { width: 40px; height: 40px; } .room-side .pick.small { min-width: 50px; }
+  .room-side .pick-row { padding: 4px 2px 6px; gap: 6px; } .room-modes .btn-xs, .room-modes .mode-chip { font-size: 13px; padding: 3px 8px; min-height: 34px; }
+  .room-main { gap: 6px; } .room-main .btn-xs { min-height: 34px; } .room-side .join-box { padding: 3px 10px; } .room-side .join-box .code-input { height: 38px; font-size: 20px; }
+  .acc-form { gap: 5px; } .acc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .acc-form .nick-input { height: 42px; font-size: 18px; width: min(34vw, 220px); }
+  .acc-form .first-title { font-size: 22px; } .acc-form .btn { min-height: 44px; } .acc-form .small { font-size: 12px; } .acc-error { min-height: 16px; font-size: 14px; }
+  .first-box { padding: 10px 18px; gap: 8px; } .first-title { font-size: 24px; } .first-box p { font-size: 16px; }
+  .wn-entry { padding: 6px 10px; } .whatsnew li { font-size: 14px; margin: 3px 0; } .wn-ver { font-size: 18px; }
+}
+@media (max-height: 400px) {
+  .btn-side { width: 70px; height: 60px; } .sb-ico { font-size: 24px; } .sb-label { font-size: 12px; }
+  .lobby-left, .lobby-right { gap: 7px; top: calc(66px + var(--sat)); }
+  .hero-tag { bottom: calc(86px + var(--sab)); }
+}
+@media (max-height: 340px) {
+  .btn-side { width: 64px; height: 52px; } .sb-ico { font-size: 21px; } .sb-label { font-size: 11px; }
+  .lobby-left, .lobby-right { gap: 5px; top: calc(63px + var(--sat)); }
+  .mode-card { height: 54px; min-width: 200px; } .mc-icon { font-size: 26px; } .mc-name { font-size: 16px; } .mc-sub { font-size: 11px; }
+  .btn-play { height: 58px; font-size: 26px; min-width: 170px; } .btn-friends { height: 54px; } .fb-ico { font-size: 20px; }
+  .hero-tag { bottom: calc(74px + var(--sab)); } .ht-name { font-size: 20px; }
+  .topbar { min-height: 48px; } .topbar .btn-icon { width: 46px; height: 46px; min-height: 46px; min-width: 46px; }
+  .modal-back { padding: 6px; } .modal { padding: 8px 12px; } .modal-inner { max-height: calc(100vh - 24px); }
+  .offer-img { width: 62px; height: 62px; } .offer { gap: 2px; } .offer .btn-sm { min-height: 38px; font-size: 15px; } .offer-art { font-size: 40px; }
+  .mini-box { height: 70px; margin: 2px 0; }
+  .pass-skin { width: 30px; height: 30px; } .pass-cell { gap: 1px; } .pass-head { margin-bottom: 0; }
+  .pass-cell.final .rc-icon { display: none; } .pass-cell.final .rc-text { font-size: 11px; line-height: 1.1; }
+  .pass-tier { width: 24px; height: 24px; font-size: 12px; border-width: 2px; } .pass-col { gap: 3px; } .pass-labels { padding-top: 26px; } .pass .hscroll { padding-bottom: 2px; }
+  .panel .choice .btn { min-height: 32px; font-size: 13px; } .panel .setting { min-height: 36px; padding: 2px 8px; } .panel .setting.choice-set { padding: 3px 8px; gap: 2px; }
+  .panel .setting > .btn-sm { min-height: 32px; font-size: 14px; } .panel .slider { height: 26px; } .panel { gap: 4px; }
+  .hd-img { width: 84px; height: 84px; } .hd-left .btn { min-height: 38px; } .hd-name { font-size: 20px; }
+  .acc-form .nick-input { height: 38px; } .acc-form { gap: 4px; } .acc-form .btn { min-height: 40px; }
+  .first-box { padding: 8px 14px; gap: 6px; }
+}
+@media (max-height: 500px) {
+  .vs-team.many { max-width: 56vw; gap: 6px; } .vs-team.many .vs-card { width: 76px; padding: 3px; } .vs-team.many .vs-card img { width: 54px; height: 54px; }
+  .vs-team.many .vs-name { font-size: 12px; max-width: 70px; } .vs-mid { font-size: 50px; } .vs-row { gap: 10px; } .vs-label { font-size: 22px; }
+  .mm-slot { width: 76px; height: 96px; } .mm-slot img { width: 60px; height: 60px; } .mm-title { font-size: 30px; } .mm { gap: 10px; }
+}
+@media (max-width: 760px) and (max-height: 500px) {
+  .vs-team { max-width: 46vw; gap: 6px; } .vs-team:not(.many) .vs-card { width: 80px; padding: 4px; } .vs-team:not(.many) .vs-card img { width: 60px; height: 60px; } .vs-team:not(.many) .vs-name { max-width: 72px; font-size: 13px; } .vs-row { gap: 6px; }
+  .vs-team.many .vs-card { width: 66px; } .vs-team.many .vs-card img { width: 46px; height: 46px; } .vs-team.many .vs-name { max-width: 60px; font-size: 11px; }
+}
+@media (max-height: 340px) {
+  .res-title { font-size: 32px; } .rr { font-size: 13px; padding: 0 8px; } .rr-val { font-size: 16px; } .rr-ico { font-size: 16px; } .res-left { gap: 3px; }
+  .results .btn-play { height: 46px; font-size: 22px; } .res-star img { width: 64px; height: 64px; } .res-total { font-size: 18px; }
+}
+@media (max-width: 700px) and (max-height: 500px) {
+  .pass-head { gap: 6px; } .xp-bar { width: 96px; } .pass-head .btn-sm { padding: 4px 10px; }
+}
+@media (max-height: 500px) {
+  .res-left { max-width: 56vw; }
+  .res-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  .rr { min-width: 0; } .rr-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr.highlight { grid-column: span 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; font-size: 14px; }
+  .rr.quest-row { grid-column: auto; font-size: 12px; padding: 2px 8px; }
+  .res-title { font-size: 34px; } .results .btn-play { height: 50px; font-size: 24px; }
+}
+@media (max-height: 500px) {
+  .room-main .room-slot { width: 104px; padding: 3px; gap: 0; min-height: 0; } .room-main .room-slot img { width: 44px; height: 44px; }
+  .room-main .room-slot .small { font-size: 11px; line-height: 1.15; } .room-main .room-slot .rc-big { font-size: 22px; }
+  .room-main .btn-play { height: 50px; font-size: 22px; } .room-main .room-code { font-size: 26px; } .room-main .room-code-box { padding: 2px 10px; gap: 10px; }
+  .room-main .room-code-box .btn-sm { min-height: 40px; font-size: 16px; }
+}
+@media (max-height: 340px) {
+  .room-main .room-slot.empty .small { display: none; } .room-main .room-slot img { width: 38px; height: 38px; }
+  .room-main .btn-play { height: 44px; font-size: 19px; } .room-main .room-code { font-size: 22px; letter-spacing: 3px; } .room-main { gap: 4px; }
+  .room-main .room-code-box .small { font-size: 11px; }
+}
+@media (max-width: 700px) and (max-height: 500px) {
+  .room-main .room-slot { width: 92px; } .room-main .room-slots { gap: 6px; flex-wrap: nowrap; }
 }

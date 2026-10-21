@@ -19,6 +19,7 @@ import { topBar } from '../common';
 import { btn, h, toast } from '../dom';
 import type { Screen } from './index';
 import { versus } from './matchmaking';
+import { enableDragScroll } from './shop';
 
 function meInfo(app: App) {
   const lo = app.selectedLoadout();
@@ -47,7 +48,7 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
     el.innerHTML = '';
     el.append(
       topBar(app, { title: 'Игра с друзьями', back: true }),
-      h('div.scroll.room-start',
+      h('div.room-start',
         h('div.room-error', err),
         h('div.room-cards',
           h('div.room-card', h('div.rc-big', '🏠'), h('div.t', 'Своя комната'), btn('СОЗДАТЬ', () => create(), 'btn-yellow')),
@@ -162,7 +163,7 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
       onclick: () => { heroProgress(s, myHero).skin = k.id; store.commit(); sfx('tab'); r.setMe({ skin: k.id }); if (isHost) renderRoom(r); },
     }, h('img', { src: app.portrait(myHero, k.id) }))) : [];
     const modes = (['gemgrab', 'showdown', 'knockout'] as ModeId[]).map((m) => isHost
-      ? btn(MODE_INFO[m].icon + ' ' + MODE_INFO[m].name, () => { r.setMode(m); s.selectedMode = m; store.commit(); sfx('tab'); }, r.mode === m ? 'btn-yellow' : 'btn-gray', { class: 'btn-sm' })
+      ? btn(MODE_INFO[m].icon + ' ' + MODE_INFO[m].name, () => { r.setMode(m); s.selectedMode = m; store.commit(); sfx('tab'); }, r.mode === m ? 'btn-yellow' : 'btn-gray', { class: 'btn-xs' })
       : h('div.mode-chip.t' + (r.mode === m ? '.on' : ''), MODE_INFO[m].icon + ' ' + MODE_INFO[m].name));
     const share = async () => {
       const text = `Заходи ко мне в «Игру странностей»! Код комнаты: ${r.code}`;
@@ -178,26 +179,30 @@ export function roomScreen(app: App, arg?: { join?: string; back?: boolean }): S
         r.start(cfg);
       }, 'btn-yellow', { class: 'btn-play' + (alone ? ' small-play' : '') })
       : h('div.room-waiting.t', h('div.mm-spin'), `Ждём, когда ${host?.nick ?? 'хост'} нажмёт «Играть»`);
+    const picks = h('div.hscroll.pick-row', ...heroBtns, ...skinBtns);
     el.append(
       topBar(app, { title: isHost ? 'Твоя комната' : 'Комната друга', back: true }),
-      h('div.scroll.room-body',
-        h('div.room-top',
+      h('div.room-body',
+        h('div.room-main',
           h('div.room-code-box',
             h('div.col', h('div.small', isHost ? 'Скажи друзьям код:' : 'Код комнаты'), h('div.room-code.t', r.code)),
             isHost ? btn('📤 Позвать', share, 'btn-blue', { class: 'btn-sm' }) : null,
           ),
-          isHost && alone ? codeField() : null,
+          h('div.room-slots', ...slots),
+          h('div.row.room-actions', play),
+          btn(isHost ? 'Закрыть комнату' : 'Выйти из комнаты', () => { offs.forEach((f) => f()); offs.length = 0; r.leave(); app.room = null; app.toLobby(); }, 'btn-red', { class: 'btn-xs' }),
         ),
-        h('div.room-slots', ...slots),
-        h('div.row.room-actions', play),
-        h('div.sec-title.t', 'Твой герой'),
-        h('div.row', ...heroBtns, ...skinBtns),
-        h('div.sec-title.t', isHost ? 'Режим' : 'Режим (выбирает хост)'),
-        h('div.row', ...modes),
-        h('div.row', btn(isHost ? 'Закрыть комнату' : 'Выйти из комнаты', () => { offs.forEach((f) => f()); offs.length = 0; r.leave(); app.room = null; app.toLobby(); }, 'btn-red', { class: 'btn-sm' })),
-        h('p.small', 'Пустые места в команде займут роботы-напарники. Соперники — роботы. Чата нет — только эмоции.'),
+        h('div.room-side',
+          isHost && alone ? codeField() : null,
+          h('div.room-label.t', 'Твой герой'),
+          picks,
+          h('div.room-label.t', isHost ? 'Режим' : 'Режим (выбирает хост)'),
+          h('div.row.room-modes', ...modes),
+          h('p.small.room-note', 'Пустые места займут роботы-напарники. Чата нет — только эмоции.'),
+        ),
       ),
     );
+    enableDragScroll(picks);
   };
 
   if (room) {
