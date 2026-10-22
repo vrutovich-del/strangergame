@@ -35,10 +35,10 @@ const miner: HeroDef = {
   id: 'miner',
   name: 'Шахтёр',
   role: 'Метатель кирок',
-  description: 'Усатый шахтёр в каске с фонариком. Кидается кирками и с разбегу таранит врагов!',
+  description: 'Крокодил-шахтёр в каске с фонариком. Кидается кирками и с разбегу таранит врагов!',
   playable: true,
   order: 5,
-  color: '#ffb02e',
+  color: '#4fb33a',
   rarity: 'superrare',
   stats: {
     hp: MINER.hp, speed: MINER.speed, reload: MINER.reload, superPerHit: MINER.superPerHit,

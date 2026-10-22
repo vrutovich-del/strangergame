@@ -1,52 +1,61 @@
-// Шахтёр: модель (model.ts), детали скинов и процедурные анимации:
-// тяжёлая походка, бросок кирки из-за головы, разбег и удар двумя кирками.
+// Шахтёр: модель автора (model.js — крокодил-шахтёр в каске с фонариком), детали скинов и процедурные
+// анимации: походка с хвостом, бросок кирки из-за плеча, разбег с ударами кирками и удар двумя кирками.
 import * as THREE from 'three';
-import { autoBlink, blink, look } from '../../render/faceKit';
 import type { HeroView } from '../../render/heroView';
 import { ease } from '../../render/heroView';
-import { group, matKit, mesh } from '../../render/kit';
+import { attachAt, group, matKit, mesh } from '../../render/kit';
 import type { SkinDef } from '../skinTypes';
 import { MINER } from './config';
-import { createMiner, MINER_JOINTS } from './model';
+// @ts-ignore — модель автора на JavaScript
+import { createMiner, MINER_RIG_NAMES } from './model.js';
 
+const flat = (v: unknown): string[] =>
+  typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(flat) : v && typeof v === 'object' ? Object.values(v).flatMap(flat) : [];
+const TAIL = ['tail_0', 'tail_1', 'tail_2', 'tail_3', 'tail_4', 'tail_5'];
+const JOINTS = [...flat(MINER_RIG_NAMES), 'pickaxe_L_tip', 'pickaxe_R_tip', 'cape', 'crystals', 'crystals_L', 'crystals_R'];
 const DASH = MINER.super.dashTiles / MINER.super.dashSpeed;
-const hide = (o: THREE.Object3D | undefined) => { if (o) o.scale.setScalar(0.0001); };
 
-/** Викинг: рогатый шлем без фонарика, длинная борода косичкой и меховой плащ. */
+const AX = new THREE.Vector3(1, 0, 0);
+const QT = new THREE.Quaternion();
+/** Повернуть узел в пространстве родителя: a < 0 — вперёд/вверх. */
+function swing(b: THREE.Object3D | undefined, a: number) {
+  if (b && a) b.quaternion.premultiply(QT.setFromAxisAngle(AX, a));
+}
+const hide = (o: THREE.Object3D | undefined | null) => { if (o) o.scale.setScalar(0.0001); };
+
+/** Викинг: рога на каске вместо фонарика и меховой плащ. */
 function viking(m: THREE.Object3D) {
   const M = matKit('viking');
-  const helmet = m.getObjectByName('helmet')!, head = m.getObjectByName('head')!, torso = m.getObjectByName('torso')!;
-  hide(m.getObjectByName('lamp'));
+  const helmet = m.getObjectByName('helmet')!, torso = m.getObjectByName('torso')!;
+  hide(m.getObjectByName('headlamp'));
   const horn = M(0xfff1d6);
   for (const s of [1, -1]) {
-    const h = group('horn', helmet, [0.3 * s, 0.14, 0]);
-    h.rotation.z = -0.9 * s;
-    mesh(new THREE.ConeGeometry(0.08, 0.32, 10), horn, 'horn_cone', h, [0, 0.16, 0]);
-    mesh(new THREE.ConeGeometry(0.05, 0.16, 8), horn, 'horn_tip', h, [0.05 * s, 0.36, 0], [0, 0, 0.6 * s]);
+    const h = group('horn');
+    attachAt(m, helmet, h, [0.27 * s, 1.74, 0.02], [0, 0, -0.9 * s]);
+    mesh(new THREE.ConeGeometry(0.075, 0.3, 10), horn, 'horn_cone', h, [0, 0.14, 0]);
+    mesh(new THREE.ConeGeometry(0.045, 0.14, 8), horn, 'horn_tip', h, [0.04 * s, 0.33, 0], [0, 0, 0.6 * s]);
   }
-  const beard = group('beard', head, [0, 0.04, 0.26]);
-  const hair = M(0xe0702a);
-  mesh(new THREE.SphereGeometry(0.2, 16, 12), hair, 'beard_top', beard, [0, -0.06, 0], undefined, [1.2, 0.8, 0.6]);
-  for (let i = 0; i < 3; i++) mesh(new THREE.SphereGeometry(0.085 - i * 0.012, 10, 8), hair, 'braid', beard, [0, -0.2 - i * 0.11, 0.04], undefined, [1, 1.2, 0.9]);
-  mesh(new THREE.TorusGeometry(0.05, 0.018, 6, 12), M(0xffd23f), 'braid_ring', beard, [0, -0.5, 0.04], [Math.PI / 2, 0, 0]);
-  const cape = group('cape', torso, [0, 0.72, -0.28]);
-  mesh(new THREE.SphereGeometry(0.42, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), M(0x7a4a2a), 'cape_fur', cape, [0, -0.32, 0], [-0.25, 0, 0], [1.05, 1.2, 0.45]);
+  const cape = group('cape');
+  attachAt(m, torso, cape, [0, 1.42, -0.24]);
+  mesh(new THREE.SphereGeometry(0.42, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), M(0x7a4a2a), 'cape_fur', cape, [0, -0.32, 0], [-0.2, 0, 0], [1.1, 1.25, 0.45]);
   mesh(new THREE.TorusGeometry(0.3, 0.07, 8, 20, Math.PI), M(0xd8c8a8), 'cape_collar', cape, [0, 0.02, 0.12], [-Math.PI / 2 + 0.2, 0, 0]);
 }
 
 /** Кристальный: на каске и плечах растут светящиеся кристаллы. */
 function crystal(m: THREE.Object3D) {
   const M = matKit('crystal');
-  const helmet = m.getObjectByName('helmet')!;
   const cols = [0x5ff4ff, 0xff7bd5, 0xb08bff];
   const gem = (c: number) => M(c, { emissive: c, ei: 0.55 });
-  const cluster = group('crystals', helmet, [0, 0.3, -0.05]);
-  [[0, 0.06, 0, 0.11, 0], [0.13, 0.0, 0.06, 0.08, 1], [-0.13, 0.0, 0.04, 0.08, 2], [0.02, -0.02, -0.15, 0.07, 1]].forEach(([x, y, z, r, c], i) => {
+  const helmet = m.getObjectByName('helmet')!;
+  const cluster = group('crystals');
+  attachAt(m, helmet, cluster, [0, 1.86, -0.08]);
+  [[0, 0.04, 0, 0.1, 0], [0.12, 0, 0.05, 0.075, 1], [-0.12, 0, 0.03, 0.075, 2], [0.02, -0.02, -0.13, 0.065, 1]].forEach(([x, y, z, r, c], i) => {
     mesh(new THREE.OctahedronGeometry(r, 0), gem(cols[c]), 'crystal', cluster, [x, y + r, z], [0.2 * i, 0.4 * i, (i - 1.5) * 0.3], [0.7, 1.8, 0.7]);
   });
   for (const s of [1, -1]) {
     const arm = m.getObjectByName(s > 0 ? 'arm_L' : 'arm_R')!;
-    const c = group(s > 0 ? 'crystals_L' : 'crystals_R', arm, [0.04 * s, 0.1, 0]);
+    const c = group(s > 0 ? 'crystals_L' : 'crystals_R');
+    attachAt(m, arm, c, [0.42 * s, 1.38, -0.02]);
     mesh(new THREE.OctahedronGeometry(0.07, 0), gem(cols[(s + 1) / 2]), 'crystal', c, [0, 0.08, 0], [0, 0, -0.4 * s], [0.7, 1.7, 0.7]);
     mesh(new THREE.OctahedronGeometry(0.05, 0), gem(cols[2]), 'crystal', c, [0.07 * s, 0.03, 0.05], [0, 0, -0.9 * s], [0.7, 1.7, 0.7]);
   }
@@ -59,144 +68,134 @@ function decorate(m: THREE.Object3D, skin: SkinDef) {
 
 const view: HeroView = {
   id: 'miner',
-  joints: [...MINER_JOINTS, 'beard', 'cape', 'crystals', 'crystals_L', 'crystals_R'],
-  outline: [0x24120a, 0.014],
+  joints: JOINTS,
+  outline: [0x13200b, 0.013],
   scale: 0.74,
-  height: 1.45,
+  height: 1.5,
   muzzle: 'hand_R',
   build(skin: SkinDef) {
-    const m = createMiner({ palette: (skin.palette ?? {}) as any });
+    const m = createMiner({ palette: skin.palette ?? {}, outline: false });
     decorate(m, skin);
     return m;
   },
   animate(r, s) {
-    const torso = r.bone('torso')!, body = r.body, t = s.t;
-    const head = r.bone('head'), helmet = r.bone('helmet'), stache = r.bone('mustache'), mouth = r.bone('mouth');
-    const legL = r.bone('leg_L'), legR = r.bone('leg_R'), armL = r.bone('arm_L'), armR = r.bone('arm_R');
-    const pickR = r.bone('pickaxe_R'), pickL = r.bone('pickaxe_L');
-    const beard = r.bone('beard'), cape = r.bone('cape');
+    const t = s.t;
+    const hips = r.bone('hips'), torso = r.bone('torso'), head = r.bone('head'), jaw = r.bone('jaw');
+    const helmet = r.bone('helmet'), lamp = r.bone('headlamp'), goggles = r.bone('goggles');
+    const armL = r.bone('arm_L'), armR = r.bone('arm_R'), pickR = r.bone('pickaxe_R'), pickL = r.bone('pickaxe_L');
+    const thighL = r.bone('thigh_L'), thighR = r.bone('thigh_R'), shinL = r.bone('shin_L'), shinR = r.bone('shin_R');
+    const cape = r.bone('cape');
     const vk = r.skinId === 'viking', cr = r.skinId === 'crystal';
-    let lid = autoBlink(t, 0.9);
+    let jawOpen = 0.28 + Math.sin(t * 2.2) * 0.03, tailSway = Math.sin(t * 1.8) * 0.12, tailLift = 0;
 
-    // смерть: валится на спину, каска улетает
+    // смерть: валится на спину, каска слетает, хвост обвисает
     if (s.dead >= 0) {
       const k = ease.out(Math.min(1, s.dead / 0.5));
-      torso.rotation.x = -1.35 * k;
-      torso.position.y -= 0.18 * k;
-      if (helmet) { helmet.position.y += 0.7 * Math.sin(Math.min(1, s.dead / 0.7) * Math.PI) + 0.1 * k; helmet.rotation.x -= 3 * k; }
-      if (armL) armL.rotation.z += 1.2 * k;
-      if (armR) armR.rotation.z -= 1.2 * k;
-      body.scale.setScalar(r.scale * Math.max(0.0001, 1 - Math.max(0, s.dead - 1.0) * 3));
-      blink(r, 1);
+      if (hips) { hips.rotation.x = -1.3 * k; hips.position.y -= 0.4 * k; }
+      if (helmet) { helmet.position.y += 0.5 * Math.sin(Math.min(1, s.dead / 0.7) * Math.PI) + 0.1 * k; helmet.rotation.x -= 2.5 * k; }
+      swing(armL, -1.0 * k); swing(armR, -1.2 * k);
+      if (jaw) jaw.rotation.x = 0.28 + 0.35 * k;
+      for (const n of TAIL) { const b = r.bone(n); if (b) b.rotation.x -= 0.1 * k; }
+      r.body.scale.setScalar(r.scale * Math.max(0.0001, 1 - Math.max(0, s.dead - 1.0) * 3));
       return;
     }
 
-    // тяжёлая походка вперевалку
-    const run = s.move;
-    const f = vk ? 9.5 : 8.5;
-    const sw = Math.sin(t * f);
-    if (legL && legR) { legL.rotation.x = sw * 0.7 * run; legR.rotation.x = -sw * 0.7 * run; }
-    if (armL && armR) { armL.rotation.x = -sw * 0.5 * run; armR.rotation.x = sw * 0.5 * run; }
-    body.position.y = Math.abs(sw) * 0.06 * run;
-    torso.rotation.z = sw * 0.07 * run;
-    torso.rotation.x = run * (vk ? 0.2 : 0.12);
-    // дыхание и покачивание кирок
-    torso.scale.y = 1 + Math.sin(t * 2.2) * 0.015;
-    if (pickR) pickR.rotation.z += Math.sin(t * 2.2) * 0.05;
-    if (pickL) pickL.rotation.z -= Math.sin(t * 2.2 + 1) * 0.05;
-    if (beard) beard.rotation.x = Math.sin(t * f) * 0.12 * run + Math.sin(t * 1.7) * 0.05;
-    if (cape) cape.rotation.x = -0.2 * run - Math.abs(sw) * 0.1 * run;
+    // походка: ноги, покачивание таза, хвост виляет
+    const run = s.move, p = t * (vk ? 10 : 9);
+    swing(thighL, 0.5 * Math.sin(p) * run); swing(thighR, -0.5 * Math.sin(p) * run);
+    swing(shinL, 0.6 * Math.max(0, -Math.sin(p)) * run); swing(shinR, 0.6 * Math.max(0, Math.sin(p)) * run);
+    if (hips) { hips.position.y += Math.abs(Math.sin(p)) * 0.04 * run; hips.rotation.z += Math.sin(p) * 0.05 * run; }
+    if (torso) { torso.rotation.y -= Math.sin(p) * 0.12 * run; torso.rotation.x += (vk ? 0.18 : 0.1) * run; }
+    swing(armL, -0.3 * Math.sin(p) * run); swing(armR, 0.3 * Math.sin(p) * run);
+    tailSway += Math.sin(p) * 0.25 * run;
+    if (cape) cape.rotation.x -= 0.25 * run + Math.abs(Math.sin(p)) * 0.08 * run;
+    // кирки слегка постукивают в покое
+    if (pickR) pickR.rotation.x += Math.max(0, Math.sin(t * 2.4)) ** 6 * 0.15 * (1 - run);
+    if (pickL) pickL.rotation.x += Math.max(0, Math.sin(t * 2.4 + 2)) ** 6 * 0.15 * (1 - run);
 
-    // атака: кирка из-за головы — замах назад, бросок вперёд; кирка улетает и «вырастает» снова
+    // атака: замах правой из-за плеча и бросок; кирка улетает и через ~0,6 с снова в руке
     const sh = s.shot;
-    if (sh >= 0 && sh < 0.8) {
+    if (sh >= 0 && sh < 0.85) {
       const u = sh / 0.34;
       let a = 0;
-      if (u < 0.45) a = 2.5 * ease.out(u / 0.45);
-      else if (u < 1) a = 2.5 - 3.6 * ease.inOut((u - 0.45) / 0.55);
-      else a = -1.1 * (1 - ease.out(Math.min(1, (sh - 0.34) / 0.3)));
-      if (armR) armR.rotation.x += a;
-      torso.rotation.y += -0.3 * ease.pulse(sh, 0.4);
-      torso.rotation.x -= 0.12 * ease.pulse(sh, 0.25) - 0.15 * ease.pulse(sh - 0.2, 0.3);
-      if (pickR) {
-        const back = sh < 0.16 ? 1 : sh < 0.5 ? 0.0001 : ease.out(Math.min(1, (sh - 0.5) / 0.2));
-        pickR.scale.setScalar(Math.max(0.0001, back));
-      }
-      if (mouth) mouth.scale.y = 1 + 0.8 * ease.pulse(sh, 0.4);
+      if (u < 0.45) a = 1.0 * ease.out(u / 0.45);
+      else if (u < 1) a = 1.0 - 3.2 * ease.inOut((u - 0.45) / 0.55);
+      else a = -2.2 * (1 - ease.out(Math.min(1, (sh - 0.34) / 0.3)));
+      swing(armR, a);
+      if (torso) torso.rotation.y += sh < 0.16 ? -0.4 * ease.out(sh / 0.16) : -0.4 + 0.7 * ease.out(Math.min(1, (sh - 0.16) / 0.2)) - 0.3 * ease.out(Math.max(0, Math.min(1, (sh - 0.4) / 0.3)));
+      if (pickR) pickR.scale.setScalar(sh < 0.2 ? 1 : sh < 0.6 ? 0.0001 : Math.max(0.0001, ease.out(Math.min(1, (sh - 0.6) / 0.2))));
+      jawOpen = 0.28 + 0.25 * ease.pulse(sh, 0.4);
     }
 
-    // супер: разбег с поднятыми кирками, потом удар двумя кирками в землю
+    // супер: разбег, наклон вперёд, удары кирками по очереди, в конце — удар двумя кирками
     const sp = s.sup;
     if (sp >= 0 && sp < DASH + 0.6) {
       if (sp < DASH) {
         const k = Math.min(1, sp / 0.1);
-        torso.rotation.x += 0.45 * k;
-        if (armL) armL.rotation.x += 2.6 * k;
-        if (armR) armR.rotation.x += 2.6 * k;
+        if (torso) torso.rotation.x += 0.35 * k;
         const fast = Math.sin(t * 18);
-        if (legL && legR) { legL.rotation.x = fast * 0.9; legR.rotation.x = -fast * 0.9; }
-        body.position.y = Math.abs(fast) * 0.08 + (vk ? 0.5 * Math.sin((sp / DASH) * Math.PI) : 0);
-        if (mouth) mouth.scale.set(1.3, 1.6, 1);
-        lid = -0.3;
+        swing(thighL, 0.9 * fast * k); swing(thighR, -0.9 * fast * k);
+        if (hips) hips.position.y += Math.abs(fast) * 0.05 + (vk ? 0.45 * Math.sin((sp / DASH) * Math.PI) : 0);
+        const ph = (sp / 0.25) % 1, left = Math.floor(sp / 0.25) % 2 === 1;
+        const chop = ph < 0.5 ? -2.4 * ease.out(ph / 0.5) : -2.4 + 3.0 * ease.inOut((ph - 0.5) / 0.5);
+        swing(left ? armL : armR, chop * k);
+        swing(left ? armR : armL, -0.8 * k);
+        jawOpen = 0.6; tailLift = 0.2;
       } else {
         const v = sp - DASH;
         const hit = ease.inOut(Math.min(1, v / 0.12));
         const rel = 1 - ease.inOut(Math.max(0, (v - 0.3) / 0.3));
-        if (armL) armL.rotation.x += (2.6 - 4.1 * hit) * rel;
-        if (armR) armR.rotation.x += (2.6 - 4.1 * hit) * rel;
-        torso.rotation.x += (0.45 + 0.25 * hit) * rel;
-        body.position.y -= 0.1 * ease.decay(v - 0.1, 0.25);
-        torso.scale.set(1 + 0.1 * ease.decay(v - 0.1, 0.25), 1 - 0.12 * ease.decay(v - 0.1, 0.25), 1);
+        swing(armL, (-2.6 + 3.4 * hit) * rel); swing(armR, (-2.6 + 3.4 * hit) * rel);
+        if (torso) torso.rotation.x += (0.35 + 0.25 * hit) * rel;
+        if (hips) hips.position.y -= 0.08 * ease.decay(v - 0.1, 0.25);
+        jawOpen = 0.6 * rel + 0.28 * (1 - rel);
       }
     }
 
-    // урон: вздрагивает, усы топорщатся
+    // урон: вздрагивает, пасть приоткрывается
     const hurt = ease.decay(s.hurt, 0.4);
     if (hurt) {
-      lid = -0.4 * hurt;
-      torso.rotation.x -= 0.18 * hurt;
-      torso.rotation.z += Math.sin(s.hurt * 45) * 0.07 * hurt;
-      if (stache) stache.scale.set(1 + 0.25 * hurt, 1 + 0.4 * hurt, 1);
-      for (const n of ['brow_L', 'brow_R']) { const b = r.bone(n); if (b) b.position.y += 0.04 * hurt; }
+      if (torso) { torso.rotation.x -= 0.15 * hurt; torso.rotation.z += Math.sin(s.hurt * 45) * 0.07 * hurt; }
+      jawOpen = Math.max(jawOpen, 0.28 + 0.25 * hurt);
     }
 
-    // победа: поднимает кирку над головой и подпрыгивает
+    // победа: кирка над головой, рёв, хвост ходуном
     if (s.win) {
-      body.position.y = Math.abs(Math.sin(t * 5)) * 0.25;
-      if (armR) armR.rotation.x -= 2.7 + Math.sin(t * 10) * 0.2;
-      if (armL) armL.rotation.z += 0.8 + Math.sin(t * 5) * 0.3;
-      if (mouth) mouth.scale.set(1.3, 1.6, 1);
-      if (stache) stache.rotation.z = Math.sin(t * 12) * 0.08;
+      if (hips) hips.position.y += Math.abs(Math.sin(t * 5)) * 0.16;
+      swing(armR, -2.6 + Math.sin(t * 10) * 0.2); swing(armL, -1.2 + Math.sin(t * 5) * 0.3);
+      jawOpen = 0.3 + 0.3 * Math.max(0, Math.sin(t * 2)) ** 2;
+      tailSway += Math.sin(t * 9) * 0.3; tailLift = 0.25;
+      if (goggles) goggles.rotation.x -= 0.6;
     }
     if (s.lose) {
-      if (head) head.rotation.x = 0.4;
-      torso.rotation.x = 0.25;
-      if (armL) armL.rotation.z -= 0.15;
-      if (armR) armR.rotation.z += 0.15;
-      lid = 0.55;
+      if (head) head.rotation.x += 0.35;
+      if (torso) torso.rotation.x += 0.2;
+      jawOpen = 0.05; tailLift = -0.2;
     }
     if (s.showcase && !s.win && !s.lose) {
+      const pose = Math.max(0, Math.sin(t * 0.8 - 1)) ** 6;
       if (vk) {
         // викинг иногда издаёт боевой клич
-        const cry = Math.max(0, Math.sin(t * 0.8 - 1)) ** 6;
-        if (armL) armL.rotation.x -= 2.4 * cry;
-        if (armR) armR.rotation.x -= 2.4 * cry;
-        if (mouth) mouth.scale.set(1 + 0.4 * cry, 1 + 1.2 * cry, 1);
-        torso.rotation.x -= 0.15 * cry;
+        swing(armL, -2.4 * pose); swing(armR, -2.4 * pose);
+        jawOpen = Math.max(jawOpen, 0.28 + 0.35 * pose);
       } else {
-        // крутит ус
-        const tw = Math.max(0, Math.sin(t * 0.9)) ** 6;
-        if (armL) { armL.rotation.x -= 1.9 * tw; armL.rotation.z += 0.6 * tw; }
-        if (stache) stache.rotation.z = Math.sin(t * 14) * 0.1 * tw;
+        // поднимает очки на каску и осматривается
+        if (goggles) goggles.rotation.x -= 0.6 * pose;
+        if (head) head.rotation.y += Math.sin(t * 2) * 0.25 * pose;
       }
     }
-    // кристаллы мерцают
-    if (cr) {
-      for (const c of ['crystals', 'crystals_L', 'crystals_R']) { const b = r.bone(c); if (b) b.scale.setScalar(1 + Math.sin(t * 4) * 0.06 + (sp >= 0 && sp < 1 ? 0.25 * ease.pulse(sp, 1) : 0)); }
+
+    if (jaw) jaw.rotation.x = jawOpen;
+    for (let i = 0; i < TAIL.length; i++) {
+      const b = r.bone(TAIL[i]);
+      if (!b) continue;
+      b.rotation.z += Math.sin(t * 1.8 - i * 0.5) * 0.04 + tailSway * (0.2 + i * 0.08);
+      b.rotation.x += tailLift * 0.15;
     }
-    if (head) head.rotation.y = Math.sin(t * 0.7) * 0.12;
-    blink(r, lid);
-    look(r, Math.sin(t * 0.6) * 0.3, hurt * 0.5);
+    // фонарик мерцает, кристаллы светятся
+    if (lamp && !vk) lamp.scale.setScalar(1 + Math.sin(t * 13) * 0.02 + (Math.sin(t * 0.7) > 0.98 ? -0.06 : 0));
+    if (cr) for (const n of ['crystals', 'crystals_L', 'crystals_R']) r.bone(n)?.scale.setScalar(1 + Math.sin(t * 4) * 0.06 + (sp >= 0 && sp < 1 ? 0.25 * ease.pulse(sp, 1) : 0));
+    if (head) head.rotation.y += Math.sin(t * 0.7) * 0.1;
   },
 };
 

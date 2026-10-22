@@ -1,4 +1,4 @@
-// Стоп-Тайм — живой будильник. Атака: два шара времени. Супер: останавливает время на 5 секунд —
+// Стоп-Тайм — робот с часами на рюкзаке. Атака: два шара времени из пушек на руках. Супер: останавливает время на 5 секунд —
 // враги, их снаряды и помощники замирают, а Стоп-Тайм и его команда бьют, кого захотят.
 import type { Fighter, HeroDef, WorldApi } from '../../sim/types';
 import { STOPTIME } from './config';
@@ -9,17 +9,17 @@ const stoptime: HeroDef = {
   id: 'stoptime',
   name: 'Стоп-Тайм',
   role: 'Повелитель времени',
-  description: 'Весёлый будильник на ножках. Кидается шарами времени и умеет останавливать время!',
+  description: 'Робот с экраном вместо лица и часами на рюкзаке. Стреляет шарами времени из пушек на руках и умеет останавливать время!',
   playable: true,
   order: 4,
-  color: '#7f6bff',
+  color: '#2f62b8',
   rarity: 'mythic',
   stats: {
     hp: STOPTIME.hp, speed: STOPTIME.speed, reload: STOPTIME.reload, superPerHit: STOPTIME.superPerHit,
     attackCooldown: STOPTIME.attackCooldown, damage: B.damage, superDamage: 0,
   },
   attackName: 'Шары времени',
-  attackDesc: `Кидает ${B.count} светящихся шара времени по прямой.`,
+  attackDesc: `Стреляет из пушек на руках: ${B.count} светящихся шара времени по прямой.`,
   superName: 'Стоп, время!',
   superDesc: `Останавливает время на ${S.seconds} секунд: враги и их снаряды замирают, а ты бьёшь кого захочешь!`,
   attackAim: { shape: 'line', range: B.range, width: 0.55 },
