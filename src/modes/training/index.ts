@@ -43,7 +43,7 @@ export class Training implements ModeRules {
     const f = m.world.addFighter(slot, x, y);
     if (kind !== 'static') { f.maxHp = f.hp = f.baseHp = 3500; }
     if (hp) { f.maxHp = f.hp = f.baseHp = hp; }
-    m.brains.set(f.id, new BotBrain(f, m.cfg.difficulty));
+    m.brains.set(f.id, new BotBrain(f, m.cfg.difficulty, m.cfg.seed));
     return f;
   }
 

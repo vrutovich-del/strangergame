@@ -90,7 +90,7 @@ describe('Шахтёр', () => {
     const d = getHero('miner');
     expect(d.playable).toBe(true);
     expect(d.rarity).toBe('superrare');
-    expect(skinsOf('miner').map((s) => s.id)).toEqual(['default', 'viking', 'crystal']);
+    expect(skinsOf('miner').map((s) => s.id)).toEqual(['default', 'viking', 'crystal', 'basketball', 'football', 'baseball']);
   });
 
   it('атака: брошенная кирка', () => {

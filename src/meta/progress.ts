@@ -48,6 +48,17 @@ export function unlockHero(s: SaveData, heroId: string) {
   heroProgress(s, heroId);
 }
 
+/** Цена героя за выбранную валюту. */
+export const heroPrice = (heroId: string, c: Currency) => ECONOMY.heroes.price[heroRarity(heroId)][c];
+
+/** Купить закрытого героя за любую валюту. */
+export function buyHero(s: SaveData, heroId: string, c: Currency): boolean {
+  if (!hasHero(heroId) || !getHero(heroId).playable || ownsHero(s, heroId)) return false;
+  if (!spend(s, c, heroPrice(heroId, c))) return false;
+  unlockHero(s, heroId);
+  return true;
+}
+
 /** Случайный ещё не открытый герой (редкие — реже). maxRarity — герой не реже этой редкости. */
 export function rollHero(s: SaveData, rng: Rng, maxRarity: Rarity = 'legendary'): string | null {
   const pool = playableHeroes().filter((h) => !ownsHero(s, h.id) && rarityRank(h.rarity ?? 'common') <= rarityRank(maxRarity));

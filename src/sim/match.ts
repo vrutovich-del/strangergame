@@ -20,7 +20,7 @@ export class Match {
     this.world = new World(map, cfg.seed);
     this.rules = createMode(cfg.mode);
     this.rules.setup(this);
-    for (const f of this.world.fighters) if (f.isBot && !this.brains.has(f.id)) this.brains.set(f.id, new BotBrain(f, cfg.difficulty));
+    for (const f of this.world.fighters) if (f.isBot && !this.brains.has(f.id)) this.brains.set(f.id, new BotBrain(f, cfg.difficulty, cfg.seed));
     this.eventLog.push(...this.world.events);
     this.world.events = [];
   }
@@ -38,7 +38,7 @@ export class Match {
     f.isBot = true;
     f.owner = '';
     f.name = f.name + ' 🤖';
-    this.brains.set(f.id, new BotBrain(f, this.cfg.difficulty));
+    this.brains.set(f.id, new BotBrain(f, this.cfg.difficulty, this.cfg.seed));
   }
 
   step(humanInputs: Map<number, FighterInput>) {

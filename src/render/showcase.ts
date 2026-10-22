@@ -116,36 +116,65 @@ export function renderPortrait(gl: THREE.WebGLRenderer, heroId: string, skinId: 
   const key = `${heroId}:${skinId}:${team}`;
   const cached = portraitCache.get(key);
   if (cached) return cached;
+  const url = snapshot(gl, heroId, skinId, team, size, size, (c, cam) => {
+    const h = c.view.height;
+    cam.position.set(0, h * 0.62, 3.25);
+    cam.lookAt(0, h * 0.47, 0);
+  });
+  portraitCache.set(key, url);
+  return url;
+}
+
+/**
+ * Портрет «по плечи» для широкой карточки героя (как в Brawl Stars): камера смотрит в лицо крупно.
+ * Где лицо — задаёт `face` в виде героя; если не задано, берём верхнюю часть модели.
+ */
+export function renderFace(gl: THREE.WebGLRenderer, heroId: string, skinId: string, w = 448, h = 264): string {
+  const key = `face:${heroId}:${skinId}`;
+  const cached = portraitCache.get(key);
+  if (cached) return cached;
+  const url = snapshot(gl, heroId, skinId, 'blue', w, h, (c, cam) => {
+    const k = c.view.scale;
+    const f = c.view.face ?? { center: [0, (c.view.height / k) * 0.78, 0] as [number, number, number], half: (c.view.height / k) * 0.3 };
+    // центр лица поворачиваем вместе с героем (он стоит вполоборота)
+    const p = new THREE.Vector3(...f.center).multiplyScalar(k).applyAxisAngle(new THREE.Vector3(0, 1, 0), c.root.rotation.y);
+    const dist = (f.half * k) / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    cam.position.set(p.x, p.y + f.half * k * 0.12, p.z + dist);
+    cam.lookAt(p.x, p.y, p.z);
+  });
+  portraitCache.set(key, url);
+  return url;
+}
+
+/** Отрисовать героя в картинку w×h с прозрачным фоном; frame() ставит камеру. */
+function snapshot(gl: THREE.WebGLRenderer, heroId: string, skinId: string, team: 'blue' | 'red' | 'orange', w: number, h: number,
+  frame: (c: Character, cam: THREE.PerspectiveCamera) => void): string {
   const scene = new THREE.Scene();
   addLights(scene, 1.05);
   const c = createCharacter(heroId, skinId, team);
   scene.add(c.root);
   c.animate({ t: 0.2, dt: 0, move: 0, shot: 99, sup: 99, hurt: 99, dead: -1, win: false, lose: false, showcase: false, helpers: false, infected: false });
   c.root.rotation.y = -0.35;
-  const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  const h = c.view.height;
-  cam.position.set(0, h * 0.62, 3.25);
-  cam.lookAt(0, h * 0.47, 0);
-  const rt = new THREE.WebGLRenderTarget(size, size, { colorSpace: THREE.SRGBColorSpace, samples: 4 });
+  const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 50);
+  frame(c, cam);
+  const rt = new THREE.WebGLRenderTarget(w, h, { colorSpace: THREE.SRGBColorSpace, samples: 4 });
   const prevTarget = gl.getRenderTarget();
   const prevClear = gl.getClearAlpha();
   gl.setRenderTarget(rt);
   gl.setClearColor(0x000000, 0);
   gl.clear();
   gl.render(scene, cam);
-  const px = new Uint8Array(size * size * 4);
-  gl.readRenderTargetPixels(rt, 0, 0, size, size, px);
+  const px = new Uint8Array(w * h * 4);
+  gl.readRenderTargetPixels(rt, 0, 0, w, h, px);
   gl.setRenderTarget(prevTarget);
   gl.setClearAlpha(prevClear);
   rt.dispose();
   c.dispose();
   const cv = document.createElement('canvas');
-  cv.width = size; cv.height = size;
+  cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d')!;
-  const img = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y++) img.data.set(px.subarray((size - 1 - y) * size * 4, (size - y) * size * 4), y * size * 4);
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) img.data.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
   ctx.putImageData(img, 0, 0);
-  const url = cv.toDataURL('image/png');
-  portraitCache.set(key, url);
-  return url;
+  return cv.toDataURL('image/png');
 }

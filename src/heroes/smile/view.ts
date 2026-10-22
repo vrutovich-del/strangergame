@@ -4,6 +4,7 @@ import { autoBlink, blink, blinkOne, look } from '../../render/faceKit';
 import type { HeroView } from '../../render/heroView';
 import { ease } from '../../render/heroView';
 import { attachAt, group, matKit, mesh, roundedBox, toon } from '../../render/kit';
+import { animateSport, isSport, SPORT_JOINTS, sportGear, type SportFit } from '../../render/sport';
 import type { SkinDef } from '../skinTypes';
 // @ts-ignore — модель автора на JavaScript
 import { createSmiley, SMILEY_RIG_NAMES } from './model.js';
@@ -85,7 +86,20 @@ function robo(m: THREE.Object3D) {
   [0x5ee05a, 0xffd23f, 0x3fd8ff].forEach((c, i) => mesh(new THREE.SphereGeometry(0.035, 10, 8), M(c, { emissive: c, ei: 1 }), 'panel_light', panel, [(i - 1) * 0.1, 0, 0.03]));
 }
 
+/** Спортивная форма: повязка вместо кепки, мяч в левой руке (футбольный — у ног), бита на плече, номер на спине. */
+const SPORT: SportFit = {
+  head: { node: 'torso', c: [0, EGG.y, 0], r: [EGG.rx, EGG.ry, EGG.rz] },
+  band: 0.6,
+  cap: false, // у Смайла своя кепка — её перекрашивает палитра скина
+  ball: { basketball: { node: 'hand_L', p: [0.95, 1.12, 0.2] }, football: { node: 'root', p: [0.32, 0.2, 0.55] } },
+  ballR: 0.21,
+  bat: { node: 'hand_L', p: [0.92, 0.8, 0.24], r: [-0.5, 0, 0.15], len: 1.0 },
+  number: { node: 'torso', p: [0, 0.86, -0.59], r: [-0.2, Math.PI, 0], h: 0.22, plate: 0.6 },
+  hide: { basketball: ['cap'], football: ['cap'] },
+};
+
 function decorate(m: THREE.Object3D, skin: SkinDef) {
+  if (isSport(skin.id) && skin.kit) sportGear(m, skin.id, SPORT, skin.kit);
   const torso = m.getObjectByName('torso')!;
   if (skin.id === 'ninja') ninja(m);
   if (skin.id === 'robo') robo(m);
@@ -115,11 +129,12 @@ function decorate(m: THREE.Object3D, skin: SkinDef) {
 
 const view: HeroView = {
   id: 'smile',
-  joints: [...JOINTS, 'helmet', 'band_tails', 'katana', 'antenna'],
+  joints: [...JOINTS, 'helmet', 'band_tails', 'katana', 'antenna', ...SPORT_JOINTS],
   outline: [0x2a1206, 0.012],
   scale: 0.74,
   height: 1.5,
   muzzle: 'hand_R',
+  face: { center: [0, 1.15, 0.2], half: 0.6 },
   build(skin: SkinDef) {
     // обводку система моделей добавит после украшений скина (стекло шлема — без обводки)
     const m = createSmiley({ palette: skin.palette ?? {}, outline: false });
@@ -128,6 +143,7 @@ const view: HeroView = {
     return m;
   },
   animate(r, s) {
+    animateSport(r, s);
     const torso = r.bone('torso')!, body = r.body;
     const t = s.t;
     const legL = r.bone('leg_L'), legR = r.bone('leg_R');

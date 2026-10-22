@@ -1,25 +1,46 @@
-// Магазин: ежедневная акция, скины, ящики, кристаллы, эмоции. Нигде нет реальных денег.
+// Магазин: ежедневная акция, герои, скины, ящики, кристаллы, эмоции. Нигде нет реальных денег.
 import { sfx } from '../../audio/sfx';
-import { playableHeroes } from '../../heroes/registry';
-import { skinsOf } from '../../heroes/skins';
+import { getHero, playableHeroes } from '../../heroes/registry';
+import { skinsOf, type SkinDef } from '../../heroes/skins';
 import { EMOTE_LIST } from '../../render/battleView';
-import { ECONOMY, type BoxKind } from '../../meta/economy';
-import { boxOdds, buyEmote, buySkin, canAfford, dailyDeal, grant, ownsHero, ownsSkin, spend } from '../../meta/progress';
+import { ECONOMY, type BoxKind, type Currency } from '../../meta/economy';
+import { boxOdds, buyEmote, buyHero, buySkin, canAfford, dailyDeal, grant, heroPrice, ownsHero, ownsSkin, spend } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
 import { rewardCard, topBar } from '../common';
-import { btn, h, modal, toast } from '../dom';
-import { boxOverlay } from './boxes';
+import { btn, confirmBox, h, modal, toast } from '../dom';
+import { boxOverlay, rarityBadge } from './boxes';
 import type { Screen } from './index';
 
 const CUR = { coins: '🪙', gems: '💎', bling: '✨' };
+const LACK = { coins: 'Не хватает монет', gems: 'Не хватает кристаллов', bling: 'Не хватает блингов' };
+
+/** Кнопки «купить героя» — по одной на каждую валюту, с подтверждением. */
+export function heroBuyButtons(heroId: string, onBought: () => void) {
+  const s = store.data;
+  const d = getHero(heroId);
+  return h('div.hero-prices', ...(['coins', 'gems', 'bling'] as Currency[]).map((cur) => {
+    const price = heroPrice(heroId, cur);
+    const can = canAfford(s, cur, price);
+    return btn([h('span.hp-ico', CUR[cur]), h('span.hp-val', String(price))], () => {
+      if (!canAfford(s, cur, price)) { toast(LACK[cur], 'bad'); return; }
+      confirmBox('Купить героя?', `${d.name} за ${CUR[cur]} ${price}. Герой откроется сразу.`, 'Купить', () => {
+        if (!buyHero(s, heroId, cur)) return;
+        store.commit();
+        sfx('levelup');
+        toast(`Новый герой: ${d.name}!`, 'good');
+        onBought();
+      });
+    }, cur === 'gems' ? 'btn-green' : cur === 'bling' ? 'btn-purple' : 'btn-yellow', { class: 'btn-sm hp-btn' + (can ? '' : ' cant') });
+  }));
+}
 
 export function shopScreen(app: App, section?: string): Screen {
   const s = store.data;
   const refresh = () => app.open('shop', section);
   const priceBtn = (cur: 'coins' | 'gems' | 'bling', amount: number, onBuy: () => void, label?: string) =>
     btn(label ?? [CUR[cur], String(amount)], () => {
-      if (!canAfford(s, cur, amount)) { toast(cur === 'coins' ? 'Не хватает монет' : cur === 'gems' ? 'Не хватает кристаллов' : 'Не хватает блингов', 'bad'); return; }
+      if (!canAfford(s, cur, amount)) { toast(LACK[cur], 'bad'); return; }
       onBuy();
     }, cur === 'gems' ? 'btn-green' : cur === 'bling' ? 'btn-purple' : 'btn-yellow', { class: 'btn-sm' });
 
@@ -38,11 +59,21 @@ export function shopScreen(app: App, section?: string): Screen {
     }),
   );
 
-  // скины
+  // герои: любого закрытого героя можно купить за монеты, кристаллы или блинги
+  const locked = playableHeroes().filter((d) => !ownsHero(s, d.id));
+  const heroCards = locked.length
+    ? locked.map((d) => h('div.offer.hero', { style: { '--rc': d.color } as any },
+      h('img.offer-img', { src: app.portrait(d.id) }),
+      h('div.offer-title.t', d.name),
+      rarityBadge(d.rarity ?? 'common'),
+      heroBuyButtons(d.id, refresh),
+    ))
+    : [h('div.offer.hero.all', h('div.offer-art', '🎉'), h('div.offer-title.t', 'Все герои открыты!'))];
+
+  // скины: обычные и спортивная коллекция; сначала — скины открытых героев
   const skins = playableHeroes().flatMap((hd) => skinsOf(hd.id).filter((k) => k.id !== 'default' && !k.exclusive));
-  // сначала скины открытых героев
   skins.sort((a, b) => Number(ownsHero(s, b.heroId)) - Number(ownsHero(s, a.heroId)));
-  const skinCards = skins.map((k) => {
+  const skinCard = (k: SkinDef) => {
     const owned = ownsSkin(s, k.heroId, k.id);
     const heroOpen = ownsHero(s, k.heroId);
     return h('div.offer.skin' + (heroOpen ? '' : '.locked'), { style: { '--sc': k.cardColor } as any },
@@ -53,7 +84,9 @@ export function shopScreen(app: App, section?: string): Screen {
         if (buySkin(s, k.heroId, k.id)) { s.heroes[k.heroId].skin = k.id; store.commit(); sfx('buy'); toast('Новый скин: ' + k.name + '!', 'good'); refresh(); }
       }),
     );
-  });
+  };
+  const skinCards = skins.filter((k) => !k.kit).map(skinCard);
+  const sportCards = skins.filter((k) => k.kit).map(skinCard);
 
   // ящики
   const boxCard = (kind: BoxKind) => {
@@ -90,6 +123,8 @@ export function shopScreen(app: App, section?: string): Screen {
   const sec = (id: string, title: string, items: HTMLElement[]) => h('div.shop-sec#sec-' + id, h('div.sec-title.t', title), h('div.sec-items', ...items));
   const body = h('div.shop-row',
     sec('deal', 'Ежедневная акция', [dealCard]),
+    sec('heroes', 'Герои', heroCards),
+    sec('sport', '🏀 Спортивные скины ⚽', sportCards),
     sec('skins', 'Скины', skinCards),
     sec('boxes', 'Ящики', (['common', 'big', 'mega'] as BoxKind[]).map(boxCard)),
     sec('gems', 'Кристаллы', gemCards),

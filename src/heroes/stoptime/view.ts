@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { HeroView, Rig } from '../../render/heroView';
 import { ease } from '../../render/heroView';
 import { attachAt, group, matKit, mesh, roundedBox } from '../../render/kit';
+import { animateSport, isSport, SPORT_JOINTS, sportGear, type SportFit } from '../../render/sport';
 import type { SkinDef } from '../skinTypes';
 // @ts-ignore — модель автора на JavaScript
 import { createStopTime, STOP_TIME_RIG_NAMES } from './model.js';
@@ -65,24 +66,39 @@ function nightStars(m: THREE.Object3D) {
   });
 }
 
+/** Спортивная форма: повязка на голове, мяч на поясе (футбольный — у ног), кепка, номер и бита на рюкзаке. */
+const SPORT: SportFit = {
+  head: { node: 'head', c: [0, 1.42, 0], r: [0.28, 0.2, 0.24] },
+  band: 0.45,
+  cap: { cut: 0.45 },
+  ball: { basketball: { node: 'hips', p: [0.42, 0.6, -0.1] }, football: { node: 'root', p: [0.24, 0.18, 0.42] } },
+  ballR: 0.17,
+  bat: { node: 'backpack', p: [-0.33, 0.66, -0.42], r: [0.15, 0, 0.12], len: 0.85 },
+  number: { node: 'backpack', p: [0, 1.0, -0.6], r: [0, Math.PI, 0], h: 0.2 },
+  hide: { baseball: ['crest'] },
+};
+
 function decorate(m: THREE.Object3D, skin: SkinDef) {
+  if (isSport(skin.id) && skin.kit) sportGear(m, skin.id, SPORT, skin.kit);
   if (skin.id === 'cuckoo') cuckooClock(m);
   if (skin.id === 'night') nightStars(m);
 }
 
 const view: HeroView = {
   id: 'stoptime',
-  joints: JOINTS,
+  joints: [...JOINTS, ...SPORT_JOINTS],
   outline: [0x0d1430, 0.012],
   scale: 0.78,
   height: 1.45,
   muzzle: 'muzzle_R',
+  face: { center: [0, 1.4, 0.05], half: 0.46 },
   build(skin: SkinDef) {
     const m = createStopTime({ palette: skin.palette ?? {}, outline: false });
     decorate(m, skin);
     return m;
   },
   animate(r, s) {
+    animateSport(r, s);
     const t = s.t;
     const hips = r.bone('hips'), torso = r.bone('torso'), head = r.bone('head');
     const armL = r.bone('arm_L'), armR = r.bone('arm_R'), canL = r.bone('cannon_L'), canR = r.bone('cannon_R');

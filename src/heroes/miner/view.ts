@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { HeroView } from '../../render/heroView';
 import { ease } from '../../render/heroView';
 import { attachAt, group, matKit, mesh } from '../../render/kit';
+import { animateSport, isSport, SPORT_JOINTS, sportGear, type SportFit } from '../../render/sport';
 import type { SkinDef } from '../skinTypes';
 import { MINER } from './config';
 // @ts-ignore — модель автора на JavaScript
@@ -61,24 +62,39 @@ function crystal(m: THREE.Object3D) {
   }
 }
 
+/** Спортивная форма: повязка вместо каски, мяч на поясе (футбольный — у ног), шлем бэттера, бита и номер на спине. */
+const SPORT: SportFit = {
+  head: { node: 'head', c: [0, 1.52, 0.02], r: [0.2, 0.18, 0.23] },
+  band: 0.3,
+  cap: false, // у Шахтёра каска — в бейсболе это шлем бэттера, его перекрашивает палитра
+  ball: { basketball: { node: 'hips', p: [0.46, 0.78, -0.2] }, football: { node: 'root', p: [0.28, 0.18, 0.48] } },
+  ballR: 0.18,
+  bat: { node: 'torso', p: [-0.3, 0.92, -0.36], r: [0.15, 0, -0.75], len: 0.9 },
+  number: { node: 'torso', p: [0, 1.12, -0.31], r: [0, Math.PI, 0], h: 0.22, plate: 0.4 },
+  hide: { basketball: ['helmet', 'goggles'], football: ['helmet'], baseball: ['headlamp', 'headlamp_light'] },
+};
+
 function decorate(m: THREE.Object3D, skin: SkinDef) {
+  if (isSport(skin.id) && skin.kit) sportGear(m, skin.id, SPORT, skin.kit);
   if (skin.id === 'viking') viking(m);
   if (skin.id === 'crystal') crystal(m);
 }
 
 const view: HeroView = {
   id: 'miner',
-  joints: JOINTS,
+  joints: [...JOINTS, ...SPORT_JOINTS],
   outline: [0x13200b, 0.013],
   scale: 0.74,
   height: 1.5,
   muzzle: 'hand_R',
+  face: { center: [0, 1.52, 0.15], half: 0.47 },
   build(skin: SkinDef) {
     const m = createMiner({ palette: skin.palette ?? {}, outline: false });
     decorate(m, skin);
     return m;
   },
   animate(r, s) {
+    animateSport(r, s);
     const t = s.t;
     const hips = r.bone('hips'), torso = r.bone('torso'), head = r.bone('head'), jaw = r.bone('jaw');
     const helmet = r.bone('helmet'), lamp = r.bone('headlamp'), goggles = r.bone('goggles');
@@ -192,8 +208,8 @@ const view: HeroView = {
       b.rotation.z += Math.sin(t * 1.8 - i * 0.5) * 0.04 + tailSway * (0.2 + i * 0.08);
       b.rotation.x += tailLift * 0.15;
     }
-    // фонарик мерцает, кристаллы светятся
-    if (lamp && !vk) lamp.scale.setScalar(1 + Math.sin(t * 13) * 0.02 + (Math.sin(t * 0.7) > 0.98 ? -0.06 : 0));
+    // фонарик мерцает (если скин его не снял), кристаллы светятся
+    if (lamp && lamp.scale.x > 0.01) lamp.scale.setScalar(1 + Math.sin(t * 13) * 0.02 + (Math.sin(t * 0.7) > 0.98 ? -0.06 : 0));
     if (cr) for (const n of ['crystals', 'crystals_L', 'crystals_R']) r.bone(n)?.scale.setScalar(1 + Math.sin(t * 4) * 0.06 + (sp >= 0 && sp < 1 ? 0.25 * ease.pulse(sp, 1) : 0));
     if (head) head.rotation.y += Math.sin(t * 0.7) * 0.1;
   },

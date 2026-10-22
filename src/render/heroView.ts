@@ -50,6 +50,8 @@ export interface HeroView {
   animate(r: Rig, s: AnimState): void;
   /** Кость, откуда визуально вылетают снаряды. */
   muzzle?: string;
+  /** Лицо для карточки героя (в координатах модели): центр кадра и половина его высоты. */
+  face?: { center: [number, number, number]; half: number };
 }
 
 export const ease = {

@@ -1,5 +1,6 @@
 // ИИ роботов. Работает на стороне хоста как часть симуляции и выдаёт обычный ввод (как у игрока).
 import { dist, dist2, TAU } from '../core/math';
+import { Rng } from '../core/rng';
 import type { P2 } from '../core/grid';
 import { getHero } from '../heroes/registry';
 import type { Difficulty, Fighter, FighterInput, Minion } from '../sim/types';
@@ -48,9 +49,13 @@ export class BotBrain {
   private wanderUntil = 0;
   private stuckCheck = { x: 0, y: 0, at: 0 };
 
-  constructor(public f: Fighter, public difficulty: Difficulty) {
+  /** Своя случайность у каждого робота — от зерна матча: одинаковое зерно, одинаковый бой. */
+  private rng: Rng;
+
+  constructor(public f: Fighter, public difficulty: Difficulty, seed = 1) {
     this.p = DIFFICULTY[difficulty];
-    this.nextThink = Math.random() * this.p.think;
+    this.rng = new Rng(seed ^ Math.imul(f.id + 1, 0x9e3779b1));
+    this.nextThink = this.rng.next() * this.p.think;
   }
 
   update(w: World, goal: BotGoal | null): FighterInput {
@@ -60,7 +65,7 @@ export class BotBrain {
     // реакция обновляется не каждый тик — так ведёт себя «живой» соперник
     this.checkDodge(w);
     if (w.time >= this.nextThink) {
-      this.nextThink = w.time + this.p.think * (0.8 + Math.random() * 0.4);
+      this.nextThink = w.time + this.p.think * (0.8 + this.rng.next() * 0.4);
       this.think(w, goal);
     } else {
       // между размышлениями продолжаем идти по пути
@@ -101,7 +106,7 @@ export class BotBrain {
         moveTo = goal;
       } else {
         // держим свою дистанцию и стрейфимся
-        if (w.time > this.strafeUntil) { this.strafe = Math.random() < 0.5 ? -1 : 1; this.strafeUntil = w.time + 0.6 + Math.random() * 0.9; }
+        if (w.time > this.strafeUntil) { this.strafe = this.rng.next() < 0.5 ? -1 : 1; this.strafeUntil = w.time + 0.6 + this.rng.next() * 0.9; }
         const clear = w.map.lineClear(f.x, f.y, target.x, target.y);
         let want: number;
         if (!clear) want = Math.max(1.2, d - 2.5); // нет линии огня — подходим
@@ -120,7 +125,7 @@ export class BotBrain {
         if (clear && d <= useRange + 0.3 && f.ammo >= 1) {
           inp.attack = 1;
           inp.aim = this.aimAt(w, target, def.ai.style === 'melee' ? 30 : 12);
-          this.fireAllowedAt = w.time + this.p.fireDelay * (0.6 + Math.random() * 0.8);
+          this.fireAllowedAt = w.time + this.p.fireDelay * (0.6 + this.rng.next() * 0.8);
         }
       }
       // ── супер ──
@@ -152,7 +157,7 @@ export class BotBrain {
           }
         }
         // в кустах можно устроить засаду
-        if (goal.urgency < 0.5 && Math.random() < this.p.bush * 0.3 && !f.inBush) {
+        if (goal.urgency < 0.5 && this.rng.next() < this.p.bush * 0.3 && !f.inBush) {
           const b = this.findBushNear(w, goal, 3);
           if (b) moveTo = b;
         }
@@ -204,7 +209,7 @@ export class BotBrain {
       tx += (t as Fighter).vx * time * this.p.lead;
       ty += (t as Fighter).vy * time * this.p.lead;
     }
-    const err = (Math.random() * 2 - 1) * this.p.aimError;
+    const err = (this.rng.next() * 2 - 1) * this.p.aimError;
     return Math.atan2(ty - f.y, tx - f.x) + err;
   }
 
@@ -222,7 +227,7 @@ export class BotBrain {
       const perp = Math.abs(dx * p.vy - dy * p.vx) / pv;
       if (perp > f.radius + p.radius + 0.25) continue;
       this.dodgedIds.add(p.id);
-      if (Math.random() > this.p.dodge) continue;
+      if (this.rng.next() > this.p.dodge) continue;
       // шаг перпендикулярно полёту снаряда, в сторону от линии
       let sx = -p.vy / pv, sy = p.vx / pv;
       if (sx * dx + sy * dy < 0) { sx = -sx; sy = -sy; }
@@ -278,7 +283,7 @@ export class BotBrain {
 
   private wander(w: World): P2 {
     if (!this.wanderPt || w.time > this.wanderUntil || dist2(this.f.x, this.f.y, this.wanderPt.x, this.wanderPt.y) < 1) {
-      const a = Math.random() * TAU, r = 3 + Math.random() * 5;
+      const a = this.rng.next() * TAU, r = 3 + this.rng.next() * 5;
       const p = w.map.nearestFree(w.map.w / 2 + Math.cos(a) * r, w.map.h / 2 + Math.sin(a) * r);
       this.wanderPt = p ?? { x: w.map.w / 2, y: w.map.h / 2 };
       this.wanderUntil = w.time + 5;
@@ -299,7 +304,7 @@ export class BotBrain {
       const team = w.effTeam(f);
       const t = this.pickTarget(w, team, 7);
       if (t && w.map.lineClear(f.x, f.y, t.x, t.y)) {
-        inp.attack = 1; inp.aim = Math.atan2(t.y - f.y, t.x - f.x) + (Math.random() - 0.5) * 0.2;
+        inp.attack = 1; inp.aim = Math.atan2(t.y - f.y, t.x - f.x) + (this.rng.next() - 0.5) * 0.2;
         this.fireAllowedAt = w.time + 1.6;
       }
     }

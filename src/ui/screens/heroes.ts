@@ -11,9 +11,9 @@ import { topBar } from '../common';
 import { btn, h, modal, toast } from '../dom';
 import { rarityBadge } from './boxes';
 import type { Screen } from './index';
-import { enableDragScroll } from './shop';
+import { enableDragScroll, heroBuyButtons } from './shop';
 
-/** Где взять закрытого героя. */
+/** Где взять закрытого героя бесплатно (купить можно сразу — кнопками в окне героя и в магазине). */
 export function howToGet(heroId: string) {
   const road = TROPHY_ROAD.find((m) => m.reward.kind === 'hero' && m.reward.heroId === heroId);
   const ways = ['⭐ Старр-дропы за победы', '📦 ящики'];
@@ -23,7 +23,8 @@ export function howToGet(heroId: string) {
 
 export function heroesScreen(app: App, focus?: string): Screen {
   const s = store.data;
-  const grid = h('div.hero-row');
+  // сетка как в Brawl Stars: три ряда широких карточек с лицом героя, листается вбок
+  const grid = h('div.hero-grid');
   const all = playableHeroes();
   const owned = all.filter((d) => ownsHero(s, d.id)).length;
   for (const d of all) {
@@ -32,20 +33,21 @@ export function heroesScreen(app: App, focus?: string): Screen {
     const cost = upgradeCost(hp.level);
     const canUp = has && cost !== null && s.coins >= cost;
     const rar = RARITY[d.rarity ?? 'common'];
-    const card = h('div.hero-card' + (s.selectedHero === d.id ? '.selected' : '') + (has ? '' : '.locked'), {
-      onclick: () => heroDetail(app, d.id), style: { '--hc': d.color, '--rc': rar.color } as any,
+    const card = h('div.hg-card' + (s.selectedHero === d.id ? '.selected' : '') + (has ? '' : '.locked'), {
+      onclick: () => heroDetail(app, d.id), style: { '--hc': d.color, '--rc': rar.color, '--rd': rar.dark, '--nl': String(d.name.length) } as any,
     },
-      has ? h('div.hc-top', h('span.lvl-badge', 'Ур. ' + hp.level), h('span.hc-trophies.t', '🏆 ' + hp.trophies)) : h('div.hc-top', h('span.hc-lock', '🔒'), null),
-      h('img.hc-img', { src: app.portrait(d.id, has && ownsSkin(s, d.id, hp.skin) ? hp.skin : 'default') }),
-      h('div.hc-name.t', d.name),
-      h('div.hc-role', has ? d.role : 'Ещё не открыт'),
-      s.selectedHero === d.id ? h('div.hc-sel', '✔ Выбран') : null,
-      canUp ? h('div.hc-up', '⬆ Прокачка!') : null,
-      h('div.hc-rarity.t', rar.name),
+      h('img.hg-face', { src: app.face(d.id, has && ownsSkin(s, d.id, hp.skin) ? hp.skin : 'default'), alt: d.name }),
+      has ? h('div.hg-lvl.t', String(hp.level)) : h('div.hg-lock', '🔒'),
+      canUp ? h('div.hg-up.t', '▲') : null,
+      s.selectedHero === d.id ? h('div.hg-sel', '✔') : null,
+      h('div.hg-bottom',
+        has ? h('span.hg-tr.t', '🏆 ' + hp.trophies) : null,
+        h('span.hg-name.t', d.name),
+      ),
     );
     grid.appendChild(card);
   }
-  grid.appendChild(h('div.hero-card.soon', h('div.soon-q', '?'), h('div.hc-name.t', `Герой №${all.length + 1}`), h('div.hc-role', 'Скоро! Автор уже придумывает…')));
+  grid.appendChild(h('div.hg-card.soon', h('div.soon-q', '?'), h('div.hg-bottom', h('span.hg-name.t', 'Скоро!'))));
   const scroller = h('div.hscroll.hero-scroll', grid);
   const el = h('div.screen.panel-screen', topBar(app, { title: `Герои ${owned}/${all.length}`, back: true }), scroller);
   if (focus) setTimeout(() => heroDetail(app, focus), 50);
@@ -103,9 +105,13 @@ export function heroDetail(app: App, heroId: string) {
       ]
       : [
         h('div.hd-locked.t', '🔒 Ещё не открыт'),
-        h('div.hd-how', h('div.small', 'Как получить:'), ...howToGet(heroId).map((x) => h('div.hd-way', x))),
-        h('div.small', 'Попробовать можно на Полигоне — там доступны все герои.'),
+        h('div.small', 'Купить сразу:'),
+        heroBuyButtons(heroId, () => refresh()),
       ];
+    // закрытый герой: где взять бесплатно — справа, над описанием (слева место под кнопки покупки)
+    const how = has ? null : h('div.hd-how',
+      h('div.small', 'Или получить бесплатно:'), ...howToGet(heroId).map((x) => h('div.hd-way', x)),
+      h('div.small.hd-try', 'Попробовать можно на Полигоне — там доступны все герои.'));
     return h('div.hero-detail' + (upgraded ? '.flash' : ''), { style: { '--hc': d.color } as any },
       h('div.hd-left',
         h('img.hd-img' + (has ? '' : '.dim'), { src: app.portrait(heroId, has && ownsSkin(s, heroId, hp.skin) ? hp.skin : 'default') }),
@@ -119,6 +125,7 @@ export function heroDetail(app: App, heroId: string) {
           btn(`👕 Скины (${skins.length})`, () => { tab = 'skins'; sfx('tab'); refresh(); }, tab === 'skins' ? 'btn-yellow' : 'btn-gray', { class: 'btn-xs' }),
         ),
         tab === 'info' ? h('div.hd-info',
+          how,
           h('p.hd-desc', d.description),
           h('div.stats',
             statRow('❤️ Здоровье', prev ? prev.hp : st.hp, prev ? st.hp : undefined),

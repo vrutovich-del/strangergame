@@ -48,17 +48,36 @@
 @keyframes playPulse { 50% { transform: scale(1.04); } }
 
 /* ───────── герои ───────── */
-.hero-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
-.hero-card { position: relative; background: linear-gradient(160deg, var(--hc, #6c56d8), #2c1d63 75%); border: 4px solid var(--ink); border-radius: 20px; padding: 10px; display: flex; flex-direction: column; align-items: center; cursor: pointer; box-shadow: 0 6px 0 var(--ink); transition: transform .1s; min-height: 250px; }
-.hero-card:active { transform: scale(.97); }
-.hero-card.selected { outline: 4px solid var(--yellow); }
-.hc-top { display: flex; justify-content: space-between; width: 100%; } .hc-trophies { font-size: 16px; }
-.hc-img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 6px 0 rgba(0,0,0,.3)); }
-.hc-name { font-size: 26px; } .hc-role { font-size: 14px; opacity: .85; text-align: center; }
-.hc-up { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); background: var(--green); border: 3px solid var(--ink); border-radius: 10px; padding: 0 8px; font-size: 14px; animation: dot 1s infinite; white-space: nowrap; }
-.hc-sel { font-size: 14px; color: var(--yellow); }
-.hero-card.soon { background: repeating-linear-gradient(45deg, #3b2a86, #3b2a86 14px, #33247a 14px, #33247a 28px); cursor: default; justify-content: center; }
-.soon-q { font-size: 110px; color: rgba(255,255,255,.35); line-height: 1; text-shadow: var(--stroke); }
+/* сетка как в Brawl Stars: три ряда широких карточек с лицом героя, листается вбок.
+   Высота карточки — треть высоты ленты (единицы cqh), ширина — по пропорции. */
+.hero-scroll { container-type: size; }
+.hero-grid { --gap: 10px; --ch: clamp(64px, calc((100cqh - 2 * var(--gap) - 14px) / 3), 190px); --cw: calc(var(--ch) * 1.7);
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(3, var(--ch)); grid-auto-columns: var(--cw); gap: var(--gap);
+  align-content: center; width: max-content; height: 100%; margin: 0 auto; padding: 6px 6px 8px; }
+.hg-card { position: relative; overflow: hidden; cursor: pointer; border: 3px solid var(--ink); border-radius: calc(var(--ch) * 0.12); box-shadow: 0 4px 0 var(--ink);
+  background: linear-gradient(115deg, var(--rc) 0 52%, color-mix(in srgb, var(--rc) 70%, var(--hc)) 52% 100%); transition: transform .1s; }
+.hg-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), transparent 55%); }
+.hg-card:active { transform: scale(.96); }
+.hg-card.selected { outline: 3px solid var(--yellow); outline-offset: 1px; }
+.hg-face { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: drop-shadow(0 3px 0 rgba(0,0,0,.25)); }
+.hg-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: flex-end; gap: 4px;
+  padding: calc(var(--ch) * 0.12) calc(var(--ch) * 0.06) calc(var(--ch) * 0.03); background: linear-gradient(transparent, rgba(16, 8, 36, .78)); }
+/* длинное имя на маленькой карточке уменьшается, чтобы влезть рядом с трофеями (--nl — число букв) */
+.hg-name { margin-left: auto; font-size: min(calc(var(--ch) * 0.18), calc((var(--cw) - var(--ch) * 0.5 - 18px) / var(--nl, 6) * 1.3)); line-height: 1; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hg-tr { flex: none; margin-right: auto; font-size: calc(var(--ch) * 0.12); line-height: 1.2; padding: 0 calc(var(--ch) * 0.05); background: rgba(16, 8, 36, .7); border-radius: 6px; white-space: nowrap; }
+.hg-lvl { position: absolute; top: calc(var(--ch) * 0.05); right: calc(var(--ch) * 0.05); width: calc(var(--ch) * 0.27); height: calc(var(--ch) * 0.27);
+  display: flex; align-items: center; justify-content: center; font-size: calc(var(--ch) * 0.16); background: radial-gradient(circle at 40% 35%, #d18aff, #8a2ed8); border: 2px solid var(--ink); border-radius: 50%; }
+.hg-up { position: absolute; top: calc(var(--ch) * 0.05); right: calc(var(--ch) * 0.35); width: calc(var(--ch) * 0.22); height: calc(var(--ch) * 0.22);
+  display: flex; align-items: center; justify-content: center; font-size: calc(var(--ch) * 0.13); background: var(--green); border: 2px solid var(--ink); border-radius: 50%; animation: dot 1s infinite; }
+.hg-sel { position: absolute; top: 0; left: 0; padding: 0 calc(var(--ch) * 0.07); font-size: calc(var(--ch) * 0.15); color: var(--ink); background: var(--yellow); border-radius: 0 0 8px 0; }
+.hg-lock { position: absolute; top: calc(var(--ch) * 0.04); left: calc(var(--ch) * 0.06); font-size: calc(var(--ch) * 0.2); }
+.hg-card.locked .hg-name, .hg-card.soon .hg-name { font-size: calc(var(--ch) * 0.18); }
+.hg-card.locked { background: linear-gradient(115deg, #5a5274 0 52%, #463e60 52% 100%); }
+.hg-card.locked .hg-face { filter: grayscale(1) brightness(.45); }
+.hg-card.soon { cursor: default; background: repeating-linear-gradient(45deg, #3b2a86, #3b2a86 14px, #33247a 14px, #33247a 28px); display: flex; align-items: center; justify-content: center; }
+.hg-card.soon::before { display: none; }
+.soon-q { color: rgba(255,255,255,.35); line-height: 1; text-shadow: var(--stroke); }
+.hg-card.soon .soon-q { font-size: calc(var(--ch) * 0.6); margin-bottom: calc(var(--ch) * 0.15); }
 .modal-back.wide .modal { max-width: min(96vw, 980px); width: 96vw; }
 .hero-detail { display: flex; gap: 22px; }
 .hero-detail.flash { animation: upFlash .8s; }
@@ -166,6 +185,7 @@
 .pass-cell.prem { background: linear-gradient(#ffb13f, #8a3a10); }
 .pass-cell.claimed { opacity: .55; }
 .pass-cell.final { outline: 4px solid var(--yellow); }
+.pass-cell.has-skin:not(.final) { outline: 3px solid #7fe8ff; }
 .pass-skin { width: 70px; height: 70px; object-fit: contain; }
 
 /* ───────── задания ───────── */
@@ -277,15 +297,26 @@
 /* ───────── редкость, закрытые герои ───────── */
 .rarity-badge { display: inline-block; background: var(--rc, #9fd8ff); color: #fff; border: 3px solid var(--ink); border-radius: 10px; padding: 0 10px; font-size: 16px; text-shadow: var(--stroke); white-space: nowrap; }
 .hero-tag .rarity-badge { margin-top: 4px; font-size: 14px; }
-.hc-rarity { margin-top: auto; width: calc(100% + 20px); margin-bottom: -10px; padding: 3px 0; background: var(--rc); border-top: 3px solid var(--ink); border-radius: 0 0 16px 16px; font-size: 15px; text-align: center; text-shadow: var(--stroke); }
-.hero-card.locked { background: linear-gradient(160deg, #4a4366, #221a3d 75%); }
-.hero-card.locked .hc-img { filter: grayscale(1) brightness(.45) drop-shadow(0 6px 0 rgba(0,0,0,.3)); }
-.hc-lock { font-size: 26px; line-height: 1; }
 .hd-img.dim { filter: grayscale(1) brightness(.5); }
 .hd-locked { font-size: 22px; color: var(--yellow); }
 .hd-how { display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,.25); border: 3px solid var(--ink); border-radius: 12px; padding: 6px 12px; }
 .hd-way { font-size: 16px; }
 .offer.skin.locked .offer-img { filter: grayscale(.85) brightness(.7); }
+.offer.hero { width: 214px; background: linear-gradient(170deg, var(--rc), #2c1d63 80%); }
+.offer.hero.all { justify-content: center; }
+.hero-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; width: 100%; }
+.hp-btn { flex-direction: column; gap: 0; min-width: 0; min-height: 52px; padding: 3px 2px; line-height: 1.05; }
+.hp-btn.cant { filter: saturate(.4) brightness(.8); }
+.hp-ico { font-size: 18px; } .hp-val { font-size: 16px; }
+.hd-left { max-width: 260px; }
+.hd-info .hd-how { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 0; margin-bottom: 8px; } .hd-how .small { width: 100%; }
+.hd-left .hero-prices { width: 100%; min-width: 180px; }
+.hd-left .btn.hp-btn { min-height: 48px; padding: 3px 2px; font-size: inherit; }
+@media (max-height: 500px) {
+  .hd-left .btn.hp-btn { min-height: 40px; } .hp-ico { font-size: 15px; } .hp-val { font-size: 14px; } .hd-info .hd-how { margin-bottom: 4px; }
+  .hd-left { max-width: 210px; }
+  .offer.hero { width: 190px; } .offer .btn.hp-btn { min-height: 42px; padding: 3px 2px; }
+}
 .reward-card.hero { background: linear-gradient(var(--rc), color-mix(in srgb, var(--rc) 45%, #1a0f2e)); }
 .rc-img { width: 64px; height: 64px; object-fit: contain; }
 .box-reward.hero { gap: 6px; }
@@ -357,7 +388,7 @@
   .quest { padding: 4px 10px; gap: 8px; } .q-text { font-size: 16px; } .login-day .reward-card { padding: 2px; } .q-head { font-size: 16px; margin: 4px; }
   .box-title { font-size: 30px; } .br-icon { font-size: 90px; } .br-img { width: 150px; height: 150px; }
   .btn-friends { height: 64px; padding: 2px 10px; } .fb-ico { font-size: 24px; } .fb-label { font-size: 14px; }
-  .br-new { font-size: 32px; } .drop-rarity { font-size: 26px; } .hc-rarity { font-size: 13px; }
+  .br-new { font-size: 32px; } .drop-rarity { font-size: 26px; }
   .drop-screen { gap: 8px; } .join-box { padding: 4px 10px; font-size: 15px; } .join-box .code-input { height: 40px; font-size: 22px; width: 150px; }
 }
 .tb-left { min-width: 0; flex: 1 1 auto; } .tb-right { flex: none; }
@@ -381,10 +412,7 @@
 /* ───────── телефон боком: всё на одном экране, прокрутка только вбок ───────── */
 .hscroll { min-height: 0; }
 .hero-scroll, .mode-scroll, .panels { display: flex; }
-.hero-row, .mode-row, .panel-row { display: flex; gap: 14px; padding: 6px 6px 4px; height: 100%; align-items: stretch; }
-.hero-row .hero-card { flex: none; width: 190px; min-height: 0; }
-.hero-row .hc-img { flex: 1 1 auto; min-height: 0; width: 100%; height: auto; max-height: 170px; }
-.hero-row .hero-card.soon .soon-q { font-size: 90px; }
+.mode-row, .panel-row { display: flex; gap: 14px; padding: 6px 6px 4px; height: 100%; align-items: stretch; }
 .mode-row { margin: 0 auto; }
 .mode-row .mode-big { flex: none; width: 214px; min-height: 0; }
 .modes-foot { padding: 2px 0; }
@@ -436,7 +464,6 @@
 .acc-fields { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 
 @media (max-height: 500px) {
-  .hero-row .hero-card { width: 150px; padding: 6px; } .hc-name { font-size: 20px; } .hc-role { font-size: 12px; }
   .mode-row .mode-big { width: 170px; padding: 10px; } .mb-name { font-size: 20px; } .mb-desc { font-size: 13px; } .mb-short { font-size: 14px; } .mb-icon { font-size: 32px; }
   .pick img { width: 62px; height: 62px; } .pick { min-width: 84px; padding: 4px 8px; font-size: 14px; } .pick.small img { width: 50px; height: 50px; } .pick.small { min-width: 60px; }
   .pick-label { width: 78px; font-size: 18px; } .pick-label small { font-size: 10px; }
@@ -462,6 +489,7 @@
   .pass-tier { width: 30px; height: 30px; font-size: 14px; } .pass-col { gap: 5px; } .pass-row { gap: 8px; }
   .pass-cell { width: 96px; padding: 3px; gap: 2px; } .pass-cell .rc-icon { font-size: 18px; } .pass-cell .rc-text { font-size: 12px; max-width: 64px; }
   .pass-skin { width: 40px; height: 40px; } .pass-cell .btn-xs { min-height: 30px; font-size: 13px; padding: 2px 8px; } .pass-cell .locked-tag { font-size: 16px; min-height: 18px; }
+  .pass-cell.has-skin .rc-icon { display: none; } .pass-cell.has-skin .rc-text { font-size: 11px; line-height: 1.1; max-width: 88px; }
   .pass .shop-note { display: none; } .pass-labels { padding-top: 34px; width: 70px; }
   .room-code { font-size: 30px; letter-spacing: 5px; } .room-slots { gap: 8px; } .room-slot { width: 112px; } .room-label { font-size: 15px; } .room-note { display: none; }
   .room-side .join-box .code-input { width: 120px; }
@@ -489,7 +517,7 @@
   .offer-img { width: 62px; height: 62px; } .offer { gap: 2px; } .offer .btn-sm { min-height: 38px; font-size: 15px; } .offer-art { font-size: 40px; }
   .mini-box { height: 70px; margin: 2px 0; }
   .pass-skin { width: 30px; height: 30px; } .pass-cell { gap: 1px; } .pass-head { margin-bottom: 0; }
-  .pass-cell.final .rc-icon { display: none; } .pass-cell.final .rc-text { font-size: 11px; line-height: 1.1; }
+  .pass-cell.has-skin .rc-icon { display: none; } .pass-cell.has-skin .rc-text { font-size: 11px; line-height: 1.1; }
   .pass-tier { width: 24px; height: 24px; font-size: 12px; border-width: 2px; } .pass-col { gap: 3px; } .pass-labels { padding-top: 26px; } .pass .hscroll { padding-bottom: 2px; }
   .panel .choice .btn { min-height: 32px; font-size: 13px; } .panel .setting { min-height: 36px; padding: 2px 8px; } .panel .setting.choice-set { padding: 3px 8px; gap: 2px; }
   .panel .setting > .btn-sm { min-height: 32px; font-size: 14px; } .panel .slider { height: 26px; } .panel { gap: 4px; }

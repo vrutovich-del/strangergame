@@ -39,4 +39,26 @@ export const SKINS: SkinDef[] = [
     palette: { skin: 0x0d0d2a, hair: 0x3fd8ff, spotA: 0xff3fd8, spotB: 0x3fd8ff, spotC: 0x9dff3f, glowGreen: 0x3fd8ff, glowPurple: 0xff3fd8, sclera: 0xe8fbff },
     shotColor: 0x3fd8ff, sfxPitch: 1.25,
   },
+  // спортивная коллекция
+  {
+    id: 'basketball', heroId: 'bacteria', name: 'Бактерия-Баскетболистка', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#2fae4a',
+    desc: 'Спортивная коллекция: повязка, рюкзак с номером 11 и мяч, который крутится прямо на макушке!',
+    kit: { main: 0x2fae4a, accent: 0xffffff, number: '11' },
+    palette: { strap: 0x2fae4a, strapDark: 0x1f7a34, wood: 0x2fae4a, woodDark: 0x1f7a34, woodLid: 0x5ad06a },
+    shotColor: 0xff8a2a, sfxPitch: 1.05,
+  },
+  {
+    id: 'football', heroId: 'bacteria', name: 'Бактерия-Футболистка', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#e8323e',
+    desc: 'Спортивная коллекция: красно-белая форма с номером 9 и мяч у ног. В меню чеканит мяч!',
+    kit: { main: 0xe8323e, accent: 0xffffff, number: '9' },
+    palette: { strap: 0xe8323e, strapDark: 0xa01a28, wood: 0xe8323e, woodDark: 0xa01a28, woodLid: 0xffffff },
+    shotColor: 0xffffff, sfxPitch: 1.15,
+  },
+  {
+    id: 'baseball', heroId: 'bacteria', name: 'Бактерия-Бейсболистка', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#ffd23f',
+    desc: 'Спортивная коллекция: жёлтая кепка вместо очков, номер 3 и бита за спиной.',
+    kit: { main: 0xffd23f, accent: 0x1f3a7a, number: '3' },
+    palette: { strap: 0xffd23f, strapDark: 0xc8a020, wood: 0xffd23f, woodDark: 0xc8a020, woodLid: 0x1f3a7a },
+    shotColor: 0xf4f4f8, sfxPitch: 0.95,
+  },
 ];

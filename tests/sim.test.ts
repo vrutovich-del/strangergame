@@ -15,6 +15,16 @@ function run(cfg: MatchConfig, seconds: number) {
   return m;
 }
 
+describe('одинаковое зерно — одинаковый бой', () => {
+  it('роботы решают одинаково: два боя с одним зерном совпадают', () => {
+    const snap = (m: Match) => JSON.stringify({ result: m.result, t: m.time, f: m.world.fighters.map((f) => [f.x.toFixed(4), f.y.toFixed(4), f.hp, f.alive]) });
+    for (const mode of ['gemgrab', 'showdown'] as const) {
+      const cfg = botsOnly(buildLineup({ mode, humans: [{ name: 'Я', heroId: 'lion', skinId: 'default', level: 3, owner: 'test' }], difficulty: 'hard', seed: 7 }));
+      expect(snap(run(cfg, 40))).toBe(snap(run(cfg, 40)));
+    }
+  });
+});
+
 describe('карты', () => {
   it('все карты разбираются и имеют старты', () => {
     for (const def of MAPS) {

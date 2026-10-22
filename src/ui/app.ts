@@ -14,7 +14,7 @@ import { cloud } from '../net/cloud';
 import { buildLineup, type HumanEntry } from '../modes/lineup';
 import { prewarm } from '../render/models';
 import { GameRenderer } from '../render/renderer';
-import { renderPortrait, Showcase } from '../render/showcase';
+import { renderFace, renderPortrait, Showcase } from '../render/showcase';
 import { simplifierReady } from '../render/simplify';
 import { Match } from '../sim/match';
 import type { MatchConfig, MatchResult } from '../sim/types';
@@ -168,6 +168,11 @@ export class App implements Nav {
 
   portrait(heroId: string, skinId = 'default', team: 'blue' | 'red' | 'orange' = 'blue') {
     return renderPortrait(this.r.gl, heroId, skinId, team);
+  }
+
+  /** Портрет «по плечи» для сетки героев. */
+  face(heroId: string, skinId = 'default') {
+    return renderFace(this.r.gl, heroId, skinId);
   }
 
   toLobby() {

@@ -67,6 +67,15 @@ export const ECONOMY = {
   heroes: {
     weight: { common: 1, rare: 1, superrare: 0.7, epic: 0.45, mythic: 0.25, legendary: 0.12 } as Record<Rarity, number>,
     duplicateGems: { common: 20, rare: 40, superrare: 60, epic: 100, mythic: 150, legendary: 250 } as Record<Rarity, number>,
+    /** Цена героя: его можно купить сразу за любую валюту — монеты, кристаллы или блинги. Чем реже, тем дороже. */
+    price: {
+      common: { coins: 400, gems: 20, bling: 150 },
+      rare: { coins: 800, gems: 40, bling: 300 },
+      superrare: { coins: 1500, gems: 75, bling: 550 },
+      epic: { coins: 2500, gems: 125, bling: 900 },
+      mythic: { coins: 4000, gems: 199, bling: 1400 },
+      legendary: { coins: 6000, gems: 299, bling: 2100 },
+    } as Record<Rarity, Record<Currency, number>>,
   },
   /**
    * Старр-дроп: выдаётся за каждую победу. Редкость определяется сразу, а при открытии дроп «повышается»
@@ -135,18 +144,33 @@ export const TROPHY_ROAD: { at: number; reward: Reward | { kind: 'future'; text:
   { at: 1500, reward: { kind: 'box', box: 'mega' } },
 ];
 
+/** Спортивные скины пропуска: каждый сезон баскетбол, футбол и бейсбол достаются разным героям по кругу. */
+const PASS_SPORT_HEROES = ['smile', 'bacteria', 'lion', 'stoptime', 'miner'];
+export function passSportSkins(season: number): { basketball: Reward; football: Reward; baseball: Reward } {
+  const H = PASS_SPORT_HEROES, n = Math.max(0, season - 1);
+  return {
+    basketball: { kind: 'skin', heroId: H[n % H.length], skinId: 'basketball' },
+    football: { kind: 'skin', heroId: H[(n + 1) % H.length], skinId: 'football' },
+    baseball: { kind: 'skin', heroId: H[(n + 2) % H.length], skinId: 'baseball' },
+  };
+}
+
 /** Награды боевого пропуска по уровням (бесплатная и премиум линии). */
 export function passRewards(season: number): { free: Reward[]; premium: Reward[] } {
   const free: Reward[] = [], premium: Reward[] = [];
+  const sport = passSportSkins(season);
   for (let t = 1; t <= ECONOMY.pass.tiers; t++) {
-    // бесплатная линия
-    if (t % 10 === 0) free.push({ kind: 'box', box: 'big' });
+    // бесплатная линия: на 15 уровне — спортивный скин
+    if (t === 15) free.push(sport.football);
+    else if (t % 10 === 0) free.push({ kind: 'box', box: 'big' });
     else if (t % 5 === 0) free.push({ kind: 'gems', amount: 10 });
     else if (t % 3 === 0) free.push({ kind: 'bling', amount: 20 });
     else if (t % 4 === 0) free.push({ kind: 'box', box: 'common' });
     else free.push({ kind: 'coins', amount: 30 + t * 2 });
-    // премиум линия
+    // премиум линия: на 8 и 22 уровнях — спортивные скины, в конце — эксклюзив
     if (t === ECONOMY.pass.tiers) premium.push(season % 2 === 1 ? { kind: 'skin', heroId: 'smile', skinId: 'gold' } : { kind: 'skin', heroId: 'bacteria', skinId: 'neon' });
+    else if (t === 8) premium.push(sport.basketball);
+    else if (t === 22) premium.push(sport.baseball);
     else if (t % 10 === 0) premium.push({ kind: 'box', box: 'mega' });
     else if (t % 5 === 0) premium.push({ kind: 'gems', amount: 25 });
     else if (t % 2 === 0) premium.push({ kind: 'bling', amount: 30 });

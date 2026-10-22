@@ -4,6 +4,7 @@ import { autoBlink, blink, look } from '../../render/faceKit';
 import type { HeroView } from '../../render/heroView';
 import { ease } from '../../render/heroView';
 import { attachAt, group, matKit, mesh, toon } from '../../render/kit';
+import { animateSport, isSport, SPORT_JOINTS, sportGear, type SportFit } from '../../render/sport';
 import type { SkinDef } from '../skinTypes';
 // @ts-ignore — модель автора на JavaScript
 import { createPurpleGerm, PURPLE_GERM_RIG_NAMES } from './model.js';
@@ -79,7 +80,29 @@ function jelly(m: THREE.Object3D) {
   }
 }
 
+/** Спортивная форма: повязка вместо очков, баскетбольный мяч крутится на макушке, номер и бита — на рюкзаке. */
+const SPORT: SportFit = {
+  // макушка у капли полнее, чем у эллипсоида BODY: этот эллипсоид облегает верх головы
+  head: { node: 'torso', c: [0, 1.0, 0], r: [0.64, 0.69, 0.56] },
+  band: 0.7,
+  cap: { cut: 0.3 },
+  ball: { basketball: { node: 'torso', p: [0, BODY.y + BODY.ry + 0.32, 0] }, football: { node: 'root', p: [0.5, 0.2, 0.62] } },
+  ballR: 0.2,
+  bat: { node: 'torso', p: [-0.34, 0.6, -0.56], r: [0, 0, -0.75], len: 0.95 },
+  number: { node: 'torso', p: [0, 0.95, -0.53], r: [0, Math.PI, 0], h: 0.2, plate: 0.5 },
+  hide: { basketball: ['goggles'], baseball: ['goggles'] },
+};
+
 function decorate(m: THREE.Object3D, skin: SkinDef) {
+  if (isSport(skin.id) && skin.kit) {
+    sportGear(m, skin.id, SPORT, skin.kit);
+    // под кепкой жгутиков на макушке не видно
+    if (skin.id === 'baseball') {
+      m.updateMatrixWorld(true);
+      const p = new THREE.Vector3();
+      m.traverse((o) => { if (/^cilia_\d\d$/.test(o.name) && o.getWorldPosition(p).y > 1.3) hide(o); });
+    }
+  }
   const torso = m.getObjectByName('torso')!;
   if (skin.id === 'ghost') ghost(m, skin);
   if (skin.id === 'jelly') jelly(m);
@@ -105,17 +128,19 @@ function decorate(m: THREE.Object3D, skin: SkinDef) {
 
 const view: HeroView = {
   id: 'bacteria',
-  joints: JOINTS,
+  joints: [...JOINTS, ...SPORT_JOINTS],
   outline: [0x14071c, 0.013],
   scale: 0.74,
   height: 1.5,
   muzzle: 'weapon_muzzle',
+  face: { center: [0, 0.98, 0.2], half: 0.66 },
   build(skin: SkinDef) {
     const m = createPurpleGerm({ palette: skin.palette ?? {}, outline: false });
     decorate(m, skin);
     return m;
   },
   animate(r, s) {
+    animateSport(r, s);
     const torso = r.bone('torso')!, body = r.body, t = s.t;
     const legL = r.bone('leg_L'), legR = r.bone('leg_R');
     const gh = r.skinId === 'ghost', jl = r.skinId === 'jelly', floats = gh || jl;

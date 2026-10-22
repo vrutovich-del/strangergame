@@ -40,4 +40,26 @@ export const SKINS: SkinDef[] = [
     },
     shotColor: 0xd27bff, sfxPitch: 0.85,
   },
+  // спортивная коллекция
+  {
+    id: 'basketball', heroId: 'lion', name: 'Лев-Баскетболист', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#d8202e',
+    desc: 'Спортивная коллекция: майка с номером 1, белая повязка и мяч, который крутится на кончике хвоста!',
+    kit: { main: 0xd8202e, accent: 0xffffff, number: '1' },
+    palette: { vest: 0xd8202e, headband: 0xffffff, headbandDark: 0xd8202e, cloth: 0xffffff, kneepad: 0xffffff },
+    shotColor: 0xff8a2a, sfxPitch: 1.0,
+  },
+  {
+    id: 'football', heroId: 'lion', name: 'Лев-Футболист', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#2fae4a',
+    desc: 'Спортивная коллекция: зелёная форма с номером 17 и мяч у передних лап. Бежит — мяч катится!',
+    kit: { main: 0x2fae4a, accent: 0xffd23f, number: '17' },
+    palette: { vest: 0x2fae4a, headband: 0xffd23f, headbandDark: 0x2fae4a, cloth: 0xffffff, kneepad: 0x2fae4a },
+    shotColor: 0xffffff, sfxPitch: 1.05,
+  },
+  {
+    id: 'baseball', heroId: 'lion', name: 'Лев-Бейсболист', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#1f5fd0',
+    desc: 'Спортивная коллекция: кепка между ушами, форма с номером 24 и бита за спиной.',
+    kit: { main: 0x1f5fd0, accent: 0xff8a2a, number: '24' },
+    palette: { vest: 0xf4f4f8, headband: 0x1f5fd0, headbandDark: 0x14408a, cloth: 0x1f5fd0, kneepad: 0x1f5fd0 },
+    shotColor: 0xf4f4f8, sfxPitch: 0.9,
+  },
 ];

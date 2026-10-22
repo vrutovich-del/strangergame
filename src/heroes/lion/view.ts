@@ -5,6 +5,7 @@ import { autoBlink, blink, look } from '../../render/faceKit';
 import type { HeroView, Rig } from '../../render/heroView';
 import { ease } from '../../render/heroView';
 import { attachAt, group, matKit, mesh, roundedBox } from '../../render/kit';
+import { animateSport, isSport, SPORT_JOINTS, sportGear, type SportFit } from '../../render/sport';
 import type { SkinDef } from '../skinTypes';
 import { LION } from './config';
 // @ts-ignore — модель автора на JavaScript
@@ -131,24 +132,41 @@ function knight(m: THREE.Object3D) {
   mesh(roundedBox(0.66, 0.035, 0.95, 0.015), red, 'cape_cloth', cape, [0, 0, -0.47]);
 }
 
+/** Спортивная форма: своя повязка (перекрашена палитрой), мяч на хвосте или у лап, кепка, бита и номер на спине. */
+function sportFit(m: THREE.Object3D): SportFit {
+  const tip = m.getObjectByName('tail_5')?.getWorldPosition(new THREE.Vector3()) ?? new THREE.Vector3(0, 1, -1.5);
+  return {
+    head: { node: 'head', c: [0, 1.47, 0.6], r: [0.3, 0.26, 0.33] },
+    band: false,
+    cap: { cut: 0.5 },
+    ball: { basketball: { node: 'tail_5', p: [tip.x, tip.y + 0.2, tip.z] }, football: { node: 'root', p: [0, 0.17, 1.06] } },
+    ballR: 0.17,
+    bat: { node: 'spine', p: [0.3, 0.88, -0.4], r: [-0.25, 0, 0.6], len: 0.9 },
+    number: { node: 'spine', p: [0, 1.16, -0.36], r: [-0.35, Math.PI, 0], h: 0.2, plate: 0.45 },
+  };
+}
+
 function decorate(m: THREE.Object3D, skin: SkinDef) {
+  if (isSport(skin.id) && skin.kit) sportGear(m, skin.id, sportFit(m), skin.kit);
   if (skin.id === 'dragon') dragon(m);
   if (skin.id === 'knight') knight(m);
 }
 
 const view: HeroView = {
   id: 'lion',
-  joints: JOINTS,
+  joints: [...JOINTS, ...SPORT_JOINTS],
   outline: [0x2a1006, 0.014],
   scale: 0.68,
   height: 1.4,
   muzzle: 'paw_R',
+  face: { center: [0, 1.36, 0.6], half: 0.58 },
   build(skin: SkinDef) {
     const m = createLion({ palette: skin.palette ?? {}, outline: false });
     decorate(m, skin);
     return m;
   },
   animate(r, s) {
+    animateSport(r, s);
     const root = r.body, t = s.t;
     const body = r.bone('body'), spine = r.bone('spine'), neck = r.bone('neck'), jaw = r.bone('jaw');
     const armL = r.bone('arm_L'), armR = r.bone('arm_R'), thighL = r.bone('thigh_L'), thighR = r.bone('thigh_R');

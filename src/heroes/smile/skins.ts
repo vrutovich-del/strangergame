@@ -39,4 +39,26 @@ export const SKINS: SkinDef[] = [
     palette: { skinTop: 0xfff0a0, skinMid: 0xffc933, skinBottom: 0xc8860f, limb: 0xffc933, lid: 0xffd04a, forehead: 0xffe27a, capBlue: 0x1c1c22, capOrange: 0xffd23f, capSeam: 0x8a6a10, vest: 0x1c1c22, vestTrim: 0xffd23f, glove: 0x1c1c22, boot: 0x1c1c22, grenade: 0xffe27a },
     shotColor: 0xffd23f, sfxPitch: 1.1,
   },
+  // спортивная коллекция
+  {
+    id: 'basketball', heroId: 'smile', name: 'Смайл-Баскетболист', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#6a2cc0',
+    desc: 'Спортивная коллекция: майка с номером 23, повязка и мяч в руке. На бегу ведёт мяч!',
+    kit: { main: 0x6a2cc0, accent: 0xffd23f, number: '23' },
+    palette: { vest: 0x6a2cc0, vestTrim: 0xffd23f, strap: 0xffd23f, pouch: 0x6a2cc0, pouchFlap: 0x4a1c90, glove: 0xffbb22, gloveCuff: 0xffd23f, boot: 0xffffff, bootCuff: 0x6a2cc0, bootSole: 0xffd23f, lace: 0x6a2cc0 },
+    shotColor: 0xff8a2a, sfxPitch: 1.05,
+  },
+  {
+    id: 'football', heroId: 'smile', name: 'Смайл-Футболист', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#2b6fe8',
+    desc: 'Спортивная коллекция: футболка с номером 10, бутсы и мяч у ног. В меню чеканит мяч!',
+    kit: { main: 0x2b6fe8, accent: 0xffffff, number: '10' },
+    palette: { vest: 0x2b6fe8, vestTrim: 0xffffff, strap: 0xffffff, pouch: 0x2b6fe8, pouchFlap: 0x1f50b0, glove: 0xffbb22, gloveCuff: 0xffffff, boot: 0x1c1c22, bootCuff: 0xffffff, bootSole: 0xff4b55, lace: 0xffffff },
+    shotColor: 0xffffff, sfxPitch: 1.1,
+  },
+  {
+    id: 'baseball', heroId: 'smile', name: 'Смайл-Бейсболист', price: 79, currency: 'gems', rarity: 'epic', cardColor: '#1f3a7a',
+    desc: 'Спортивная коллекция: командная кепка, форма с номером 7, перчатка и бита на плече.',
+    kit: { main: 0x1f3a7a, accent: 0xe8323e, number: '7' },
+    palette: { capBlue: 0x1f3a7a, capSeam: 0x14285a, capOrange: 0xe8323e, capUnder: 0x9a1f28, vest: 0xf4f4f8, vestTrim: 0x1f3a7a, strap: 0x1f3a7a, pouch: 0x1f3a7a, pouchFlap: 0x14285a, glove: 0x8a4a1f, gloveCuff: 0x5a2a10, boot: 0x1f3a7a, bootCuff: 0xe8323e, bootSole: 0xf4f4f8 },
+    shotColor: 0xf4f4f8, sfxPitch: 0.95,
+  },
 ];

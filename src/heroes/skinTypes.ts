@@ -23,4 +23,9 @@ export interface SkinDef {
   desc: string;
   /** Файл модели GLB вместо процедурной (по желанию), путь от public/. */
   glb?: string;
+  /**
+   * Спортивная коллекция (id скина — 'basketball', 'football' или 'baseball'): цвета формы и номер на спине.
+   * Мяч, биту, кепку и повязку герой надевает сам (src/render/sport.ts).
+   */
+  kit?: { main: number; accent: number; number: string };
 }
