@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { GridMap } from '../core/grid';
 import { lerp, lerpAngle } from '../core/math';
 import { getSkin } from '../heroes/skins';
+import { EMOTES } from '../meta/economy';
 import type { AimShape, Fighter, Minion, Pickup, Projectile, SimEvent } from '../sim/types';
 import type { World } from '../sim/world';
 import { Overlay } from '../ui/overlay';
@@ -38,9 +39,8 @@ const HERO_FX: Record<string, { shot: number; sparks: number[]; death: number[] 
 };
 const FROZEN_FX = [0x9fd8ff, 0xffffff, 0x9f8cff];
 const SIDE_COLOR = { self: 0x7dff5a, ally: 0x3fa9ff, enemy: 0xff4b55 };
-const EMOTES = ['😀', '👍', '😢', '😡', '😎', '🤣', '🥳', '🤖', '🔥', '💪', '🦠', '⭐'];
-export const emoteChar = (i: number) => EMOTES[i] ?? '❓';
-export const EMOTE_LIST = EMOTES;
+/** Глиф эмоции по номеру (сами эмоции — в economy.ts). */
+export const emoteIcon = (i: number) => EMOTES[i]?.icon ?? 'emote';
 
 export class BattleView {
   scene = new THREE.Scene();
@@ -167,7 +167,7 @@ export class BattleView {
         const sx = (this.tmp.x * 0.5 + 0.5) * W, sy = (-this.tmp.y * 0.5 + 0.5) * H;
         pl.set({
           name: f.name, level: f.level, hp: f.hp, maxHp: f.maxHp, side, ammo: f.ammo, gems: f.gems, cubes: f.cubes,
-          infected: time < f.infectedUntil, emote: time < f.emoteUntil && f.emote >= 0 ? emoteChar(f.emote) : '', superReady: side === 'self' && f.superCharge >= 1,
+          infected: time < f.infectedUntil, emote: time < f.emoteUntil && f.emote >= 0 ? emoteIcon(f.emote) : '', superReady: side === 'self' && f.superCharge >= 1,
         });
         pl.place(sx, sy, this.tmp.z < 1);
       } else pl.place(0, 0, false);
@@ -530,7 +530,7 @@ export class BattleView {
         case 'pickup': {
           this.particles.spawn({ x: e.x, y: 0.5, z: e.y, n: Math.ceil(8 * fx), color: e.kind === 'gem' ? [0xc45cff, 0xffffff] : [0x5ee05a, 0xffffff], speed: 2, up: 3, size: 0.07, life: 0.4 });
           const p = this.screen(e.x, e.y, 1.4);
-          this.overlay.floatText(p.x, p.y, e.kind === 'gem' ? '+1 💎' : '+1 ⚡');
+          this.overlay.floatText(p.x, p.y, '+1', e.kind === 'gem' ? 'shard' : 'cube');
           break;
         }
         case 'gem': this.flashes.glow(e.x, 0.3, e.y, 0xc77aff, 1.8, 0.4); break;
@@ -540,7 +540,7 @@ export class BattleView {
             this.flashes.ring(f.x, f.y, 0x7fe04a, 2.2, 0.5);
             this.particles.spawn({ x: f.x, y: 1, z: f.y, n: Math.ceil(16 * fx), color: [0x7fe04a, 0xb05cff], speed: 2.5, up: 3, size: 0.1, life: 0.7 });
             const p = this.screen(f.x, f.y, 1.9);
-            this.overlay.floatText(p.x, p.y, 'Заражён! 🦠');
+            this.overlay.floatText(p.x, p.y, 'Заражён!', 'infect');
           }
           break;
         }

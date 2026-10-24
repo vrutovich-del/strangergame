@@ -1,13 +1,13 @@
 {
   "name": "Игра странностей",
   "short_name": "Странности",
-  "description": "Командный аркадный шутер: Смайл, Бактерия и роботы.",
+  "description": "Весёлый командный шутер со странными героями: Смайл, Бактерия, Лев, роботы и другие.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "landscape",
-  "background_color": "#2b1a5e",
-  "theme_color": "#2b1a5e",
+  "background_color": "#0f7f86",
+  "theme_color": "#0f7f86",
   "lang": "ru",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

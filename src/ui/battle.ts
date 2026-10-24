@@ -13,8 +13,10 @@ import type { GameRenderer } from '../render/renderer';
 import type { Match } from '../sim/match';
 import type { FighterInput, MatchConfig, MatchResult, SimEvent } from '../sim/types';
 import type { World } from '../sim/world';
-import { btn, confirmBox, h } from './dom';
+import { btn, confirmBox, h, modal } from './dom';
 import { Hud } from './hud';
+import { icon } from './icons';
+import { soundRows } from './screens/settings';
 
 /** Откуда берётся состояние боя: локальная симуляция, хост или клиент сети. */
 export interface BattleSource {
@@ -93,7 +95,6 @@ export class BattleScreen {
   private ended = false;
   private endTimer = 0;
   private pauseEl: HTMLElement | null = null;
-  private superReadyShown = false;
 
   constructor(
     private r: GameRenderer,
@@ -117,7 +118,8 @@ export class BattleScreen {
     this.hud = new Hud(this.root, this.input, src.mode, opts.showHints);
     this.hud.unlockedEmotes = opts.emotes;
     this.hud.onPause = () => this.togglePause();
-    this.hud.onExit = () => this.leave();
+    if (src.mode === 'training' && !src.cfg.tutorial) this.hud.onExit = () => this.leave();
+    if (src.cfg.tutorial) this.hud.onSkip = () => this.leave();
     this.input.onPause = () => this.togglePause();
     this.view.snapCamera(src.world);
     music.play('battle');
@@ -133,18 +135,24 @@ export class BattleScreen {
     if (this.src instanceof LocalSource && this.src.canPause) this.src.paused = true;
     this.input.clear();
     const close = () => this.togglePause();
-    this.pauseEl = h('div.pause-back.no-aim',
-      h('div.pause',
-        h('h2', 'Пауза'),
-        this.src.canPause ? null : h('p.small', 'В игре с друзьями бой продолжается!'),
-        btn('Продолжить', close, 'btn-yellow'),
-        h('div.row',
-          btn(audio.sfxVolume > 0 ? '🔊 Звук' : '🔇 Звук', () => { audio.sfxVolume = audio.sfxVolume > 0 ? 0 : 0.8; audio.applyVolumes(); close(); this.togglePause(); }, 'btn-blue'),
-          btn(audio.musicVolume > 0 ? '🎵 Музыка' : '🔇 Музыка', () => { audio.musicVolume = audio.musicVolume > 0 ? 0 : 0.5; audio.applyVolumes(); close(); this.togglePause(); }, 'btn-blue'),
-        ),
-        btn('Выйти из боя', () => confirmBox('Выйти из боя?', this.src.mode === 'training' ? 'Вернуться в меню?' : 'Если выйти, бой засчитается как поражение.', 'Выйти', () => { this.togglePause(); this.leave(); }), 'btn-red'),
-      ));
+    const training = this.src.mode === 'training';
+    const card = h('div.pause-card',
+      h('div.m-head', icon('pause', 'a'), h('div.m-title', 'Пауза')),
+      this.src.canPause ? null : h('div.pause-note', icon('timer'), 'Бой с друзьями не останавливается'),
+      btn('Продолжить', close, 'lime lg pause-go'),
+      h('div.pause-row',
+        btn([icon('gear'), 'Настройки'], () => this.quickSettings(), 'paper'),
+        btn([icon('exit'), 'Выйти'], () => confirmBox(training ? 'Выйти с Полигона?' : 'Выйти из боя?', training ? 'Вернёмся в меню.' : 'Бой засчитается как поражение.', 'Выйти', () => { this.togglePause(); this.leave(); },
+          { no: 'Остаться', danger: !training, glyph: 'exit', yesCls: training ? 'sky' : 'red' }), 'paper danger-text'),
+      ),
+    );
+    this.pauseEl = h('div.pause-back.no-aim', card);
     this.root.appendChild(this.pauseEl);
+  }
+
+  /** Быстрые настройки в паузе: звук, музыка, вибрация, графика. */
+  private quickSettings() {
+    modal(h('div.col.quick-set', { style: 'align-items:stretch' }, h('div.m-title', 'Настройки'), ...soundRows({ r: this.r })), { cls: 'wide', top: true });
   }
 
   private soundFor(events: SimEvent[]) {
@@ -241,11 +249,10 @@ export class BattleScreen {
     const ts = w.timeStopped ? w.timeStop! : null;
     this.hud.update(hud, {
       ammo: me?.ammo ?? 0, superCharge: me?.superCharge ?? 0, alive: !!me?.alive, respawnIn: src.respawnIn(),
-      infected: !!me && w.time < me.infectedUntil, heroColor: '#ffd23f',
+      infected: !!me && w.time < me.infectedUntil, infectLeft: me ? me.infectedUntil - w.time : 0,
+      hpFrac: me ? me.hp / me.maxHp : 1, cubes: me?.cubes ?? 0, heroColor: '#ffd23f',
       timeStop: ts ? ts.until - w.time : 0, timeStopMine: !!ts && !!me && w.effTeam(me) === ts.team,
     }, src.localTeam);
-    if (me && me.superCharge >= 1 && !this.superReadyShown) this.superReadyShown = true;
-    if (me && me.superCharge < 1) this.superReadyShown = false;
     this.view.render();
     // конец боя
     const fail = src.failure();

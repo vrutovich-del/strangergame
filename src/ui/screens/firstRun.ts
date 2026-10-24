@@ -1,103 +1,109 @@
-// Первый запуск: аккаунт (создать / войти / без аккаунта) → ник → обучение (можно пропустить) → подарок → лобби.
+// Первый запуск: приветствие («Я новый игрок» / «У меня есть аккаунт») → ник → обучение в бою (можно пропустить) → подарок → лобби.
 import { sfx } from '../../audio/sfx';
-import { starterGift } from '../../meta/progress';
 import { store } from '../../meta/store';
 import { cloud } from '../../net/cloud';
 import type { App } from '../app';
-import { btn, h, toast } from '../dom';
-import { accountForm, type AccountMode } from './account';
-import { boxOverlay } from './boxes';
+import { blobColor } from '../common';
+import { btn, h, nudge } from '../dom';
+import { icon } from '../icons';
+import { logoFull, logoMark } from '../logo';
+import { accountScreen } from './account';
 import type { Screen } from './index';
 
-const NICK_A = ['Весёлый', 'Хитрый', 'Быстрый', 'Смелый', 'Космо', 'Супер', 'Мега', 'Тихий', 'Громкий', 'Странный'];
-const NICK_B = ['Смайлик', 'Микроб', 'Бублик', 'Пиксель', 'Ёжик', 'Кактус', 'Робот', 'Пончик', 'Енот', 'Чих'];
+const NICK_A = ['Весёлый', 'Хитрый', 'Быстрый', 'Смелый', 'Космо', 'Супер', 'Мега', 'Тихий', 'Громкий', 'Странный', 'Пончик', 'Капитан'];
+const NICK_B = ['Смайлик', 'Микроб', 'Бублик', 'Пиксель', 'Ёжик', 'Кактус', 'Робот', 'Пончик', 'Енот', 'Чих', 'Зефир', 'Шпрот'];
+export const NICK_MAX = 14;
 
 export function cleanNick(s: string) {
-  return s.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+  return s.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, NICK_MAX);
 }
-const randomNick = () => NICK_A[Math.floor(Math.random() * NICK_A.length)] + NICK_B[Math.floor(Math.random() * NICK_B.length)] + Math.floor(Math.random() * 90 + 10);
+export const randomNick = () => {
+  const a = NICK_A[Math.floor(Math.random() * NICK_A.length)], b = NICK_B[Math.floor(Math.random() * NICK_B.length)];
+  const n = a + '-' + b;
+  return n.length <= NICK_MAX ? n : (a + b).slice(0, NICK_MAX);
+};
+
+/** Поле ника с кубиком случайного ника и подсказкой. onChange — после каждого изменения. */
+export function nickField(initial: string, onChange?: (ok: boolean) => void) {
+  const input = h('input', { value: initial, maxLength: NICK_MAX + 4, placeholder: 'Например, Пончик-Енот', autocomplete: 'off', spellcheck: false }) as HTMLInputElement;
+  const field = h('div.field.nick-f', input);
+  const note = h('div.field-note');
+  const check = () => {
+    const raw = input.value.trim();
+    const long = raw.length > NICK_MAX;
+    field.classList.toggle('err', long);
+    note.classList.toggle('bad', long);
+    note.replaceChildren(icon(long ? 'close' : 'info'), long ? `Длинновато: до ${NICK_MAX} букв. Кубик подскажет готовый ник.` : 'Настоящее имя не нужно — придумай смешное.');
+    onChange?.(!!cleanNick(raw) && !long);
+  };
+  input.addEventListener('input', check);
+  const dice = btn(icon('dice'), () => {
+    input.value = randomNick();
+    dice.classList.remove('spin'); void dice.offsetWidth; dice.classList.add('spin');
+    sfx('tab');
+    check();
+  }, 'gum icon dice-btn', { 'aria-label': 'Случайный ник' });
+  check();
+  return {
+    el: h('div.nick-wrap', h('div.nick-row', field, dice), note),
+    input,
+    value: () => { const raw = input.value.trim(); return raw.length > NICK_MAX ? '' : cleanNick(raw); },
+  };
+}
 
 export function firstRun(app: App, done: () => void): Screen {
   // сохранение может замениться облачным после входа — поэтому всегда store.data, а не копия
-  const el = h('div.screen.first');
-  const logo = () => h('div.logo', 'Игра', h('br'), 'странностей');
-
-  const stepWelcome = () => {
-    el.innerHTML = '';
-    el.append(
-      logo(),
-      h('div.first-box',
-        h('div.first-title.t', 'Привет!'),
-        h('p', 'Создай аккаунт — тогда прогресс не потеряется и будет на любом телефоне или компьютере.'),
-        h('div.row',
-          btn('СОЗДАТЬ АККАУНТ', () => stepAccount('register'), 'btn-yellow'),
-          btn('ВОЙТИ', () => stepAccount('login'), 'btn-green'),
-        ),
-        btn('Играть без аккаунта', () => stepNick(), 'btn-gray', { class: 'btn-sm' }),
-      ),
-    );
-  };
-
-  const stepAccount = (mode: AccountMode) => {
-    el.innerHTML = '';
-    el.append(
-      h('div.first-box',
-        accountForm(mode, (m) => {
-          const s = store.data;
-          if (m === 'login' && s.nick && s.tutorialDone) { done(); return; }
-          if (s.nick) stepTutorial(); else stepNick();
-        }, stepAccount),
-        btn('◀ Назад', () => stepWelcome(), 'btn-gray', { class: 'btn-sm' }),
-      ),
-    );
-  };
-
-  const stepNick = () => {
+  const startTutorial = () => app.playTraining('smile', 'default', true);
+  const afterLogin = () => {
     const s = store.data;
-    const input = h('input.nick-input.big', { value: s.nick || '', maxLength: 14, placeholder: 'Твой ник' }) as HTMLInputElement;
-    el.innerHTML = '';
-    el.append(
-      logo(),
-      h('div.first-box',
-        h('div.first-title.t', 'Как тебя зовут в игре?'),
-        h('div.row', input, btn('🎲', () => { input.value = randomNick(); sfx('tab'); }, 'btn-blue', { class: 'btn-sm' })),
-        h('div.small', 'Придумай прозвище. Настоящее имя писать не нужно.'),
-        btn('ДАЛЬШЕ', () => {
-          const n = cleanNick(input.value);
-          if (!n) { toast('Придумай ник или нажми 🎲', 'bad'); return; }
-          store.data.nick = n; store.commit();
-          stepTutorial();
-        }, 'btn-yellow', { class: 'btn-play' }),
-      ),
-    );
-    if (!input.value) input.value = randomNick();
+    if (s.nick && s.tutorialDone) { done(); return; }
+    if (s.nick) startTutorial(); else app.setScreen('first', nickStep(app, startTutorial));
   };
 
-  const stepTutorial = () => {
-    const s = store.data;
-    el.innerHTML = '';
-    el.append(
-      h('div.first-box',
-        h('div.first-title.t', `Привет, ${s.nick}!`),
-        h('p', 'Пройди короткое обучение: двигайся, стреляй и используй супер. Это займёт минуту!'),
-        h('div.row',
-          btn('Пропустить', () => {
-            const d = store.data;
-            d.tutorialDone = true;
-            const gift = d.giftBoxGiven ? null : starterGift(d);
-            d.giftBoxGiven = true;
-            store.commit();
-            if (gift) boxOverlay(app, 'big', gift, done, 'Подарок новичку!'); else done();
-          }, 'btn-gray'),
-          btn('НАЧАТЬ ОБУЧЕНИЕ', () => app.playTraining('smile', 'default', true), 'btn-yellow'),
-        ),
+  const welcome = (): Screen => {
+    app.showHero('smile', 'default', 'idle', blobColor('#ffd23a'));
+    const stage = h('div.stage.wl-stage');
+    app.bindSpin(stage);
+    const el = h('div.screen.welcome',
+      stage,
+      h('div.wl-side',
+        h('div.wl-logo', { html: logoFull() }),
+        btn('Я новый игрок', () => app.setScreen('first', nickStep(app, startTutorial)), 'yolk xl wl-new'),
+        cloud.enabled ? btn([icon('profile'), 'У меня есть аккаунт'], () =>
+          app.setScreen('account', accountScreen(app, 'login', () => afterLogin(), () => app.setScreen('first', welcome()))), 'paper wl-acc') : null,
+        h('div.wl-note.on-sea', 'Без аккаунта прогресс живёт на этом устройстве. Войти можно позже в настройках.'),
       ),
     );
+    return { el, stage, back: [h('div.blob.wl-blob', { style: { '--blob': blobColor('#ffd23a') } as any }), h('div.podium.wl-podium')] };
   };
 
   const s = store.data;
-  if (s.nick) stepTutorial();
-  else if (cloud.enabled && !cloud.loggedIn) stepWelcome();
-  else stepNick();
-  return { el };
+  if (s.nick) return { el: h('div.screen'), onShow: () => startTutorial() };
+  if (cloud.enabled && !cloud.loggedIn) return welcome();
+  return nickStep(app, startTutorial);
+}
+
+/** Ввод ника: шаг 1 из 3 (дальше — обучение и подарок). */
+function nickStep(app: App, next: () => void): Screen {
+  let ok = false;
+  const go = btn('Готово', () => {
+    const n = f.value();
+    if (!n) { nudge(f.el); return; }
+    store.data.nick = n;
+    store.commit();
+    sfx('levelup');
+    next();
+  }, 'lime lg nick-go', { why: 'Придумай ник или нажми на кубик' });
+  const f = nickField(store.data.nick || '', (v) => { ok = v; go.classList.toggle('disabled', !ok); });
+  const el = h('div.screen.nick-step',
+    h('div.nick-card',
+      h('div.nick-mark', { html: logoMark() }),
+      h('div.steps', h('i.on'), h('i'), h('i'), h('span', 'шаг 1 из 3')),
+      h('div.m-title', 'Как тебя будут звать?'),
+      f.el,
+      h('div.m-actions', go),
+    ),
+  );
+  void app;
+  return { el, onShow: () => setTimeout(() => f.input.focus(), 280) };
 }

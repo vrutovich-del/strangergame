@@ -1,6 +1,6 @@
 // Сцена-витрина: герой на подиуме в меню, победная поза на экране результата, портреты героев.
 import * as THREE from 'three';
-import { group, mesh, toon } from './kit';
+import { group } from './kit';
 import { Character, createCharacter } from './models';
 import type { AnimState } from './heroView';
 
@@ -14,34 +14,52 @@ export function addLights(scene: THREE.Scene, strength = 1) {
   return sun;
 }
 
+/**
+ * Витрина: герой в меню. Сам подиум (лаймовый диск-наклейка) и клякса за героем рисуются в HTML под холстом,
+ * а витрина ставит героя ногами на нижний край своей области (см. App.stage) — так он всегда стоит на подиуме.
+ */
 export class Showcase {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   chars: Character[] = [];
   private twins: Character[] = [];
   private podium: THREE.Group;
+  private hemi: THREE.HemisphereLight;
   yaw = 0;
   yawVel = 0;
   mode: 'idle' | 'win' | 'lose' = 'idle';
   private t = 0;
-  /** Сдвиг камеры по X (чтобы модель стояла не по центру экрана). */
+  /** Радость по тапу: до этого момента играем победную анимацию. */
+  private cheerUntil = 0;
+  /** Сдвиг камеры по X (чтобы модель стояла не по центру области). */
   offsetX = 0;
+  /** Какую долю высоты области занимает герой (1 — во всю высоту). */
+  fit = 0.86;
+  /** Сдвиг героя влево в долях ширины области (узкий экран: не прятать его под плашкой). Сбрасывается в set(). */
+  shiftFrac = 0;
 
   constructor() {
     addLights(this.scene);
+    this.hemi = this.scene.children.find((o) => o instanceof THREE.HemisphereLight) as THREE.HemisphereLight;
     this.podium = group('podium', this.scene);
-    mesh(new THREE.CylinderGeometry(1.25, 1.4, 0.32, 40), toon(0x4a2bb0), 'podium_base', this.podium, [0, -0.16, 0]);
-    mesh(new THREE.CylinderGeometry(1.1, 1.18, 0.1, 40), toon(0xffd23f), 'podium_top', this.podium, [0, 0.03, 0]);
-    mesh(new THREE.TorusGeometry(1.32, 0.05, 8, 48).rotateX(Math.PI / 2), toon(0x8a5cff, { emissive: 0x6a3cff, ei: 0.8 }), 'podium_ring', this.podium, [0, -0.02, 0]);
-    const sh = new THREE.Mesh(new THREE.CircleGeometry(0.75, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false }));
-    sh.position.y = 0.085;
+    // тень от героя — тёмное пятно без размытия; сам диск подиума — в HTML
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(0.62, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14121f, transparent: true, opacity: 0.22, depthWrite: false }));
+    sh.scale.set(1.25, 1, 0.55);
+    sh.position.y = 0.005;
     this.podium.add(sh);
   }
+
+  /** Земля в тон кляксы за героем: свет снизу подкрашивается её цветом. */
+  setGround(color: string) { this.hemi.groundColor.set(color); }
+
+  /** Тап по герою — анимация радости. */
+  cheer() { this.cheerUntil = this.t + 1.8; }
 
   set(items: ShowItem[], mode: 'idle' | 'win' | 'lose' = 'idle') {
     for (const c of [...this.chars, ...this.twins]) c.dispose();
     this.chars = []; this.twins = [];
     this.mode = mode;
+    this.shiftFrac = 0;
     const n = items.length;
     items.forEach((it, i) => {
       const c = createCharacter(it.heroId, it.skinId, it.team ?? 'blue');
@@ -69,7 +87,7 @@ export class Showcase {
     if (Math.abs(this.yawVel) < 0.05) this.yaw *= Math.pow(0.3, dt); // плавно возвращается лицом к нам
     const st: AnimState = {
       t: this.t, dt, move: 0, shot: 99, sup: 99, hurt: 99, dead: -1,
-      win: this.mode === 'win', lose: this.mode === 'lose', showcase: true, helpers: false, infected: false,
+      win: this.mode === 'win' || this.t < this.cheerUntil, lose: this.mode === 'lose' && this.t >= this.cheerUntil, showcase: true, helpers: false, infected: false,
     };
     for (const c of this.chars) {
       c.root.rotation.y = this.yaw + (this.chars.length > 1 ? (c.root.position.x < 0 ? 0.25 : c.root.position.x > 0 ? -0.25 : 0) : 0);
@@ -93,14 +111,20 @@ export class Showcase {
     }
   }
 
-  /** Кадр камеры под размер области. */
+  /** Кадр камеры под размер области: герой стоит ногами на нижнем крае и занимает долю fit её высоты. */
   frame(aspect: number) {
     this.camera.aspect = aspect;
     const n = Math.max(1, this.chars.length);
-    // на широких низких экранах (телефон боком) модель делаем чуть меньше и выше
-    const dist = n === 1 ? (aspect > 1.9 ? 8.2 : 7.2) : 4.2 + n * 1.5;
-    this.camera.position.set(this.offsetX, 1.6, dist);
-    this.camera.lookAt(this.offsetX, 0.45, 0);
+    const H = Math.max(1.2, ...this.chars.map((c) => c.view.height ?? 1.85));
+    // сколько мира по высоте видно: герой занимает fit высоты; узкая область — отдаляемся, чтобы влез по ширине
+    const width = H * (n === 1 ? 1.05 : 0.9 + (n - 1) * 1.6);
+    const span = Math.max(H / this.fit, width / Math.max(0.2, aspect));
+    const tan = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const dist = span / 2 / tan;
+    const cy = span / 2 - span * 0.03;
+    const ox = this.offsetX + this.shiftFrac * span * aspect;
+    this.camera.position.set(ox, cy + span * 0.1, dist);
+    this.camera.lookAt(ox, cy, 0);
     this.camera.updateProjectionMatrix();
   }
 

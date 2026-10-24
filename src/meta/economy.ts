@@ -59,7 +59,7 @@ export const ECONOMY = {
       coins: [60, 120], bling: { chance: 0.5, min: 15, max: 40 }, gems: { chance: 0.25, min: 5, max: 10 }, skin: 0.04, hero: 0.03,
     },
     mega: {
-      name: 'Мега-ящик', price: { currency: 'gems' as Currency, amount: 80 }, color: '#ff4b55',
+      name: 'Мега-ящик', price: { currency: 'gems' as Currency, amount: 80 }, color: '#ff4fa3',
       coins: [150, 300], bling: { chance: 0.8, min: 40, max: 90 }, gems: { chance: 0.5, min: 10, max: 25 }, skin: 0.12, hero: 0.07,
     },
   },
@@ -96,10 +96,10 @@ export const ECONOMY = {
   },
   /** Магазин кристаллов: выглядит как донат, но всё за игровую валюту или бесплатно. */
   gemShop: [
-    { id: 'gift', title: 'Подарок дня', gems: 5, price: null as null | { currency: Currency; amount: number }, daily: true, art: '🎁' },
-    { id: 'handful', title: 'Горсть кристаллов', gems: 10, price: { currency: 'coins' as Currency, amount: 250 }, daily: false, art: '💎' },
-    { id: 'bag', title: 'Мешок кристаллов', gems: 30, price: { currency: 'coins' as Currency, amount: 650 }, daily: false, art: '💰' },
-    { id: 'chest', title: 'Сундук кристаллов', gems: 80, price: { currency: 'coins' as Currency, amount: 1600 }, daily: false, art: '🧰' },
+    { id: 'gift', title: 'Подарок дня', gems: 5, price: null as null | { currency: Currency; amount: number }, daily: true, art: 1 },
+    { id: 'handful', title: 'Горсть', gems: 10, price: { currency: 'coins' as Currency, amount: 250 }, daily: false, art: 1 },
+    { id: 'bag', title: 'Мешок', gems: 30, price: { currency: 'coins' as Currency, amount: 650 }, daily: false, art: 3 },
+    { id: 'chest', title: 'Сундук', gems: 80, price: { currency: 'coins' as Currency, amount: 1600 }, daily: false, art: 5 },
   ],
   /** Обмен блингов на монеты (когда всё куплено). */
   /** Эмоции-значки за блинги. Первые четыре — бесплатные. */
@@ -210,4 +210,18 @@ export const DAILY_DEALS: { id: string; title: string; reward: Reward; price: { 
   { id: 'gems15', title: '15 кристаллов', reward: { kind: 'gems', amount: 15 }, price: { currency: 'coins', amount: 300 }, old: 375 },
 ];
 
-export const AVATARS = ['😀', '😎', '🤖', '👾', '🦠', '🐱', '🐶', '🦊', '🐸', '🐼', '🦄', '🐲', '⚽', '🚀', '👑', '🍕'];
+/** Аватары-значки «icon:глиф:фон». Ещё можно поставить портрет любого открытого героя («hero:id»). */
+export const AVATARS = [
+  'icon:e_happy:#ffd23a', 'icon:e_cool:#44c4ff', 'icon:robot:#8d5bff', 'icon:meteor:#2b1f5a', 'icon:infect:#c6ff3a', 'icon:coin:#fffaf0',
+  'icon:shard:#5ef0c8', 'icon:trophy:#44c4ff', 'icon:bling:#ff6fb5', 'icon:cube:#2b1f5a', 'icon:super:#14121f', 'icon:e_fire:#ffd23a',
+  'icon:e_party:#c6ff3a', 'icon:star:#ff8a2a', 'icon:gem:#2b1f5a', 'icon:e_strong:#ff6fb5',
+];
+/** Старые аватары-эмодзи (до 1.4.0) — в том же порядке, что и новые значки. */
+export const LEGACY_AVATARS = ['😀', '😎', '🤖', '👾', '🦠', '🐱', '🐶', '🦊', '🐸', '🐼', '🦄', '🐲', '⚽', '🚀', '👑', '🍕'];
+
+/** Эмоции-стикеры в бою: глиф и подпись. Номер эмоции — её место в списке (так она хранится в сохранении). */
+export const EMOTES: { icon: string; name: string }[] = [
+  { icon: 'e_happy', name: 'Привет!' }, { icon: 'e_like', name: 'Класс!' }, { icon: 'e_sad', name: 'Эх…' }, { icon: 'e_angry', name: 'Грр!' },
+  { icon: 'e_cool', name: 'Круто' }, { icon: 'e_lol', name: 'Хи-хи' }, { icon: 'e_party', name: 'Ура!' }, { icon: 'e_robot', name: 'Бип-буп' },
+  { icon: 'e_fire', name: 'Огонь' }, { icon: 'e_strong', name: 'Силач' }, { icon: 'e_germ', name: 'Чих!' }, { icon: 'e_star', name: 'Звезда' },
+];

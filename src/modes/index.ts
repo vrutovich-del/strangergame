@@ -14,10 +14,10 @@ export function createMode(id: ModeId): ModeRules {
   }
 }
 
-/** Описания режимов для меню. */
+/** Описания режимов для меню. icon — глиф из набора иконок, color — цвет режима. */
 export const MODE_INFO: Record<ModeId, { name: string; short: string; desc: string; color: string; icon: string; teams: boolean }> = {
-  gemgrab: { name: 'Захват кристаллов', short: '3 на 3', desc: 'Собери 10 кристаллов и удержи их 15 секунд!', color: '#b45cff', icon: '💎', teams: true },
-  showdown: { name: 'Выживание', short: 'Каждый за себя', desc: 'Останься последним! Собирай кубы силы и беги от ядовитого облака.', color: '#5ee05a', icon: '☠️', teams: false },
-  knockout: { name: 'Нокаут', short: 'До 2 побед', desc: 'Выбей всю команду соперников. Без воскрешений!', color: '#ff9b3f', icon: '🥊', teams: true },
-  training: { name: 'Полигон', short: 'Тренировка', desc: 'Стреляй по роботам-мишеням и примеряй скины.', color: '#3fa9ff', icon: '🎯', teams: false },
+  gemgrab: { name: 'Захват кристаллов', short: '3 на 3', desc: 'Собери 10 кристаллов и удержи их 15 секунд.', color: '#8d5bff', icon: 'shard', teams: true },
+  showdown: { name: 'Выживание', short: 'Каждый за себя', desc: 'Останься последним. Собирай кубы силы и беги от облака.', color: '#47d24a', icon: 'showdown', teams: false },
+  knockout: { name: 'Нокаут', short: 'До 2 побед', desc: 'Выбей всю команду соперников. Без воскрешений.', color: '#ff8a2a', icon: 'knockout', teams: true },
+  training: { name: 'Полигон', short: 'Тренировка', desc: 'Стреляй по мишеням и примеряй любые скины.', color: '#44c4ff', icon: 'training', teams: false },
 };

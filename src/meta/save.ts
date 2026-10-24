@@ -1,7 +1,7 @@
 // Сохранение на устройстве (localStorage) с номером версии схемы и миграциями.
 // Экспорт/импорт — коротким кодом, чтобы перенести прогресс на другое устройство.
 import type { ModeId } from '../maps/types';
-import { ECONOMY, type DropRarity } from './economy';
+import { AVATARS, ECONOMY, LEGACY_AVATARS, type DropRarity } from './economy';
 
 export const SAVE_VERSION = 3;
 /** Герой, который есть у каждого с самого начала. */
@@ -35,6 +35,8 @@ export interface Settings {
   quality: 'auto' | 'low' | 'high';
   hints: boolean;
   difficulty: Difficulty;
+  /** «Меньше анимаций»: короткие проявления вместо сдвигов, лучей и частиц. */
+  lessMotion: boolean;
 }
 
 export interface SaveData {
@@ -77,7 +79,7 @@ export function defaultSave(): SaveData {
   return {
     v: SAVE_VERSION,
     nick: '',
-    avatar: '😀',
+    avatar: AVATARS[0],
     createdAt: Date.now(),
     tutorialDone: false,
     giftBoxGiven: false,
@@ -100,7 +102,7 @@ export function defaultSave(): SaveData {
     shop: { day: '', gift: false, deal: false },
     firstWinDay: '',
     stats: { wins: {}, games: {}, kills: 0, damage: 0 },
-    settings: { sfx: 0.8, music: 0.5, vibration: true, quality: 'auto', hints: true, difficulty: 'auto' },
+    settings: { sfx: 0.8, music: 0.5, vibration: true, quality: 'auto', hints: true, difficulty: 'auto', lessMotion: false },
     selectedHero: 'smile',
     selectedMode: 'gemgrab',
     lastVersion: '',
@@ -159,6 +161,11 @@ export function migrate(raw: any): SaveData {
   if (!merged.owned.includes(STARTER_HERO)) merged.owned.unshift(STARTER_HERO);
   if (!Array.isArray(merged.drops)) merged.drops = [];
   if (!merged.owned.includes(merged.selectedHero)) merged.selectedHero = STARTER_HERO;
+  // старые аватары-эмодзи становятся значками из набора иконок
+  if (typeof merged.avatar !== 'string' || !/^(hero|icon):/.test(merged.avatar)) {
+    const i = LEGACY_AVATARS.indexOf(merged.avatar);
+    merged.avatar = AVATARS[Math.max(0, i)];
+  }
   return merged;
 }
 

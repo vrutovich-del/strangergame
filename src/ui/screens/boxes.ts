@@ -1,104 +1,95 @@
-// Открытие ящика: ящик трясётся, по тапу взрывается, награды вылетают по одной.
-import { sfx } from '../../audio/sfx';
+// Открытие ящика: ожидание (ящик дышит) → тряска от тапов (3 тапа) → взрыв → награды по одной → итог «Забрать».
+// При «Меньше анимаций» ящик открывается одним тапом без тряски.
+import { audio, sfx } from '../../audio/sfx';
 import { Rng } from '../../core/rng';
-import { RARITY } from '../../heroes/rarity';
-import { getHero } from '../../heroes/registry';
-import { getSkin } from '../../heroes/skins';
 import { ECONOMY, type BoxKind, type Reward } from '../../meta/economy';
-import { openBox, rewardLabel } from '../../meta/progress';
+import { BOX_ICON, openBox } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
-import { rewardCard } from '../common';
-import { btn, h } from '../dom';
+import { refreshCurrencies, wallet } from '../common';
+import { btn, burst, h, lessMotion } from '../dom';
+import { icon } from '../icons';
 import type { Screen } from './index';
+import { bigTile, closeLayer, rewardLayer, specialRewards, sumTile } from './rewards';
 
-/** Значок редкости. */
-export function rarityBadge(r: keyof typeof RARITY) {
-  return h('span.rarity-badge.t', { style: { '--rc': RARITY[r].color } as any }, RARITY[r].name);
-}
+const TITLE_BG: Record<BoxKind, string> = { common: '#86cbff', big: '#d6a6ff', mega: '#ff9fd0' };
 
-/** Большая карточка награды (из ящика, Старр-дропа, дороги трофеев). */
-export function rewardReveal(app: App, r: Reward): HTMLElement {
-  if (r.kind === 'hero') {
-    const d = getHero(r.heroId);
-    return h('div.box-reward.hero', { style: { '--rc': RARITY[d.rarity ?? 'common'].color } as any },
-      h('div.br-new.t', 'НОВЫЙ ГЕРОЙ!'),
-      h('img.br-img.hero-glow', { src: app.portrait(r.heroId) }),
-      h('div.br-name.t', d.name),
-      rarityBadge(d.rarity ?? 'common'),
-      h('div.br-role', d.role),
-    );
-  }
-  const l = rewardLabel(r);
-  const skin = r.kind === 'skin' ? getSkin(r.heroId, r.skinId) : null;
-  return h('div.box-reward.' + r.kind,
-    skin && r.kind === 'skin' ? h('img.br-img', { src: app.portrait(r.heroId, r.skinId) }) : h('div.br-icon', l.icon),
-    h('div.br-amount.t', skin ? 'Новый скин!' : (r.kind === 'coins' || r.kind === 'gems' || r.kind === 'bling') ? '+' + l.text : l.text),
-    h('div.br-name.t', skin ? skin.name : r.kind === 'coins' ? 'Монеты' : r.kind === 'gems' ? 'Кристаллы' : r.kind === 'bling' ? 'Блинги' : ''),
-    skin ? rarityBadge(skin.rarity) : null,
-  );
-}
-
-/** Показать открытие ящика поверх всего. given — уже выданные награды (если null — ящик откроется сейчас). */
-export function boxOverlay(app: App, kind: BoxKind, given: Reward[] | null, onDone: () => void, title?: string) {
+/** Показать открытие ящика поверх всего. given — уже выданные награды (если null — ящик откроется сейчас). gift — подарок с бантом. */
+export function boxOverlay(app: App, kind: BoxKind, given: Reward[] | null, onDone: () => void, title?: string, gift = false) {
   const t = ECONOMY.boxes[kind];
-  const root = h('div.box-screen');
-  const titleEl = h('div.box-title.t', title ?? t.name);
-  const box = h('div.big-box.' + kind, { style: { '--box': t.color } as any },
-    h('div.bb-lid'), h('div.bb-body', h('div.bb-emblem', '?')), h('div.bb-shine'));
-  const hint = h('div.box-hint.t', 'Нажми, чтобы открыть!');
-  root.append(titleEl, box, hint);
-  document.getElementById('ui')!.appendChild(root);
-  let shakeTimer = window.setInterval(() => { box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); sfx('box_shake'); }, 900);
-  let stage = 0;
+  const before = wallet();
   let rewards: Reward[] = [];
   let i = 0;
+  let taps = 0;
+  const need = lessMotion() ? 1 : 3;
+  let stage: 'wait' | 'burst' | 'item' | 'sum' = 'wait';
+  const root = rewardLayer('box-open', () => tap());
+  root.style.setProperty('--glow', t.color);
+  const titleEl = h('div.rw-title.ds', { style: { background: TITLE_BG[kind] } }, title ?? t.name);
+  const boxEl = h('div.box-obj' + (gift ? '.gift' : ''), icon(BOX_ICON[kind], 'b'), gift ? h('div.bow') : null);
+  const hint = h('div.rw-hint', 'Тапни, чтобы открыть');
+  root.append(titleEl, boxEl, hint);
+  sfx('box_shake');
+
   const finish = () => {
-    root.classList.add('hide');
-    setTimeout(() => root.remove(), 250);
-    onDone();
+    closeLayer(root);
+    // валюта «прилетает» в фишки на экране под ящиком
+    setTimeout(() => refreshCurrencies(before), 260);
+    specialRewards(app, rewards, onDone);
   };
-  const showNext = () => {
-    if (i >= rewards.length) {
-      // итог
-      root.innerHTML = '';
-      root.append(h('div.box-title.t', 'Твои награды'), h('div.box-summary', ...rewards.map((r) => rewardCard(r))), btn('Готово', finish, 'btn-yellow'));
-      return;
-    }
+  const showItem = () => {
+    if (i >= rewards.length) { summary(); return; }
+    stage = 'item';
     const r = rewards[i++];
-    const card = rewardReveal(app, r);
-    root.querySelector('.box-reward')?.remove();
-    root.querySelector('.box-left')?.remove();
-    root.append(card, h('div.box-left.t', `Осталось: ${rewards.length - i}`));
+    root.querySelector('.big-tile:not(.sum)')?.remove();
+    root.querySelector('.rw-counter')?.remove();
+    const tile = bigTile(app, r);
+    tile.classList.add('pop');
+    root.append(tile, h('div.rw-counter', `${i} из ${rewards.length}`));
+    hint.textContent = i < rewards.length ? 'Тапни — дальше' : 'Тапни — все награды';
     sfx(r.kind === 'skin' || r.kind === 'hero' ? 'levelup' : r.kind === 'coins' ? 'coin' : 'reward');
   };
-  root.addEventListener('click', () => {
-    if (stage === 0) {
-      stage = 1;
-      clearInterval(shakeTimer);
-      box.classList.add('open');
-      hint.remove();
+  const summary = () => {
+    stage = 'sum';
+    root.querySelector('.big-tile:not(.sum)')?.remove();
+    root.querySelector('.rw-counter')?.remove();
+    hint.remove();
+    titleEl.textContent = 'Твои награды';
+    titleEl.style.background = 'var(--paper)';
+    root.append(
+      h('div.sum-row', ...rewards.map((r, k) => sumTile(app, r, k))),
+      h('div.rw-btns', btn('Забрать', finish, 'lime lg')),
+    );
+    sfx('reward');
+  };
+  const tap = () => {
+    if (stage === 'wait') {
+      taps++;
+      if (taps < need) {
+        boxEl.classList.remove('shake'); void boxEl.offsetWidth; boxEl.classList.add('shake');
+        root.style.setProperty('--glow-o', String(0.4 + taps * 0.25));
+        sfx('box_shake', { pitch: 1 + taps * 0.15 });
+        audio.vibrate(15);
+        hint.textContent = `Ещё! ${taps} из ${need}`;
+        return;
+      }
+      stage = 'burst';
       sfx('box_open');
+      audio.vibrate(40);
       if (!given) { rewards = openBox(store.data, kind, new Rng(Date.now() & 0xffffff)); store.commit(); }
       else rewards = given;
-      const burst = h('div.burst');
-      for (let k = 0; k < 18; k++) burst.appendChild(h('i', { style: { '--a': `${k * 20}deg`, '--d': `${120 + Math.random() * 120}px`, background: ['#ffd23f', '#fff', t.color][k % 3] } as any }));
-      root.appendChild(burst);
-      setTimeout(() => { box.remove(); titleEl.remove(); burst.remove(); stage = 2; showNext(); }, 650);
-    } else if (stage === 2 && i < rewards.length + 1 && root.querySelector('.box-reward')) {
-      showNext();
-    }
-  });
-  return () => { clearInterval(shakeTimer); root.remove(); };
+      boxEl.classList.add('open');
+      titleEl.style.visibility = 'hidden';
+      root.appendChild(h('div.rw-flash'));
+      burst(root, ['#fffaf0', t.color, '#ffd23a'], 24, ['coin', 'gem', 'bling']);
+      setTimeout(() => { boxEl.remove(); root.querySelector('.rw-flash')?.remove(); titleEl.style.visibility = ''; titleEl.textContent = title ?? t.name; showItem(); }, lessMotion() ? 60 : 520);
+    } else if (stage === 'item') showItem();
+  };
+  return () => root.remove();
 }
 
-/** Экран-обёртка (например, подарок после обучения). */
-export function boxOpening(app: App, kind: BoxKind, onDone: () => void, title?: string, given: Reward[] | null = null): Screen {
-  const el = h('div.screen.dim');
-  let cancel = () => {};
-  return {
-    el,
-    onShow() { cancel = boxOverlay(app, kind, given, onDone, title); },
-    dispose() { void cancel; },
-  };
+/** Экран-обёртка (подарок после обучения): ящик прилетает с бантом. */
+export function boxOpening(app: App, kind: BoxKind, onDone: () => void, title?: string, given: Reward[] | null = null, gift = false): Screen {
+  const el = h('div.screen');
+  return { el, onShow() { boxOverlay(app, kind, given, onDone, title, gift); } };
 }

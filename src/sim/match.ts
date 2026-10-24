@@ -37,7 +37,7 @@ export class Match {
     if (!f || f.isBot) return;
     f.isBot = true;
     f.owner = '';
-    f.name = f.name + ' 🤖';
+    f.name = f.name + ' (робот)';
     this.brains.set(f.id, new BotBrain(f, this.cfg.difficulty, this.cfg.seed));
   }
 

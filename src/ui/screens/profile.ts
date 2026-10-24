@@ -1,4 +1,5 @@
-// Профиль: ник, аватар, статистика. Никаких личных данных — только игровой ник на этом устройстве.
+// Профиль: аватар, ник (можно сменить), трофеи и рекорд, статистика по режимам, любимый герой.
+// Никаких личных данных — только игровой ник.
 import { sfx } from '../../audio/sfx';
 import { getHero, playableHeroes } from '../../heroes/registry';
 import { MODE_INFO } from '../../modes';
@@ -6,49 +7,89 @@ import { AVATARS } from '../../meta/economy';
 import { ownsHero, totalTrophies } from '../../meta/progress';
 import { store } from '../../meta/store';
 import type { App } from '../app';
-import { topBar } from '../common';
-import { btn, h, toast } from '../dom';
+import { avatarEl, screenHead } from '../common';
+import { btn, fmtNum, h, modal, toast } from '../dom';
+import { icon } from '../icons';
 import type { Screen } from './index';
-import { accountBox } from './account';
-import { cleanNick } from './firstRun';
-import { enableDragScroll } from './shop';
+import { nickField } from './firstRun';
+
+const MR = ['18px 14px 20px 16px', '14px 18px 16px 20px', '16px 20px 14px 18px', '20px 16px 18px 14px'];
 
 export function profileScreen(app: App): Screen {
   const s = store.data;
-  const input = h('input.nick-input', { value: s.nick, maxLength: 14, placeholder: 'Ник' }) as HTMLInputElement;
-  const save = btn('Сохранить', () => {
-    const n = cleanNick(input.value);
-    if (!n) { toast('Придумай ник', 'bad'); return; }
-    s.nick = n; store.commit(); sfx('buy'); toast('Ник сохранён!', 'good'); app.open('profile');
-  }, 'btn-green', { class: 'btn-sm' });
-  const avatars = h('div.avatar-grid',
-    ...[...AVATARS, ...playableHeroes().filter((d) => ownsHero(s, d.id)).map((d) => 'hero:' + d.id)].map((a) => h('div.avatar-pick' + (s.avatar === a ? '.on' : ''), {
-      onclick: () => { s.avatar = a; store.commit(); sfx('tab'); app.open('profile'); },
-    }, a.startsWith('hero:') ? h('img', { src: app.portrait(a.slice(5)) }) : a)),
-  );
+  const refresh = () => app.setScreen('profile', profileScreen(app));
   const fav = Object.entries(s.heroes).sort((a, b) => b[1].played - a[1].played)[0];
-  const modes = (['gemgrab', 'showdown', 'knockout'] as const).map((m) => h('div.stat', h('span.st-l', MODE_INFO[m].icon + ' ' + MODE_INFO[m].name), h('span.st-v.t', `${s.stats.wins[m] ?? 0} побед / ${s.stats.games[m] ?? 0} боёв`)));
-  const panel = (title: string, ...children: (HTMLElement | null)[]) => h('div.panel', h('div.panel-title.t', title), ...children);
-  const scroller = h('div.hscroll.panels', h('div.panel-row',
-    panel('🙂 Ник',
-      h('div.prof-card',
-        h('div.avatar.big', s.avatar.startsWith('hero:') ? h('img', { src: app.portrait(s.avatar.slice(5)) }) : s.avatar),
-        h('div.col', input, save),
-      ),
-      h('div.small', 'Не пиши настоящее имя и фамилию — придумай прозвище!'),
+  const w = (m: string) => s.stats.wins[m] ?? 0, g = (m: string) => s.stats.games[m] ?? 0;
+  const modes = (['gemgrab', 'showdown', 'knockout', 'training'] as const).map((m, i) => {
+    const mi = MODE_INFO[m];
+    const a = m === 'training' ? `Выбито: ${fmtNum(s.stats.kills)}` : `Побед: ${fmtNum(w(m))}`;
+    const b = m === 'training' ? `Урона: ${fmtNum(s.stats.damage)}` : `Боёв: ${fmtNum(g(m))}`;
+    return h('div.ms-card', { style: { borderRadius: MR[i] } },
+      h('div.ms-ic', { style: { background: mi.color } }, icon(mi.icon, 'b')),
+      h('div.ms-t', h('div.ds', mi.name), h('div.ms-ab', h('span', a), h('span', b))));
+  });
+  const favBar = fav && fav[1].played > 0
+    ? h('div.fav', avatarEl(app, 'hero:' + fav[0], 'fav-av'), h('div', 'Любимый герой — ', h('b', getHero(fav[0]).name), ` · ${fmtNum(fav[1].played)} боёв · ${fmtNum(fav[1].wins)} побед`))
+    : h('div.fav', icon('heroes', 'b'), h('div', 'Любимый герой появится после первых боёв'));
+  const big = avatarEl(app, s.avatar, 'big');
+  big.addEventListener('click', () => { sfx('click'); pickAvatar(app, refresh); });
+  const left = h('div.prof-card',
+    big,
+    h('div.prof-nick.ds', s.nick || 'Игрок'),
+    h('div.row', btn('Сменить ник', () => changeNick(refresh), 'sky xs'), btn('Аватар', () => pickAvatar(app, refresh), 'paper xs')),
+    h('div.prof-tiles',
+      h('div.pt', h('span', 'Трофеи'), h('b.num', icon('trophy'), fmtNum(totalTrophies(s)))),
+      h('div.pt', h('span', 'Рекорд'), h('b.num', icon('trophy'), fmtNum(s.bestTrophies)))),
+  );
+  const el = h('div.screen.profile',
+    screenHead(app, 'Профиль', { glyph: 'profile', bg: 'var(--sky)', cur: [] }),
+    left,
+    h('div.prof-grid.stagger', ...modes, favBar),
+  );
+  return { el };
+}
+
+/** Смена ника: поле с кубиком случайного ника и подсказкой, что настоящее имя не нужно. */
+function changeNick(done: () => void) {
+  let close = () => {};
+  const f = nickField(store.data.nick);
+  close = modal(h('div.col', { style: 'align-items:stretch' },
+    h('div.m-title', 'Новый ник'),
+    f.el,
+    h('div.m-actions',
+      btn('Отмена', () => close(), 'paper sm'),
+      btn('Сохранить', () => {
+        const n = f.value();
+        if (!n) return;
+        store.data.nick = n; store.commit(); sfx('buy'); toast('Ник сохранён!', 'good', 'check'); close(); done();
+      }, 'lime sm'),
     ),
-    panel('☁️ Аккаунт', accountBox(app)),
-    panel('🖼️ Аватар', avatars),
-    panel('📊 Статистика',
-      h('div.stats',
-        h('div.stat', h('span.st-l', '🏆 Трофеи сейчас'), h('span.st-v.t', String(totalTrophies(s)))),
-        h('div.stat', h('span.st-l', '🥇 Рекорд трофеев'), h('span.st-v.t', String(s.bestTrophies))),
-        ...modes,
-        h('div.stat', h('span.st-l', '🤖 Выбито роботов'), h('span.st-v.t', String(s.stats.kills))),
-        h('div.stat', h('span.st-l', '❤️ Любимый герой'), h('span.st-v.t', fav && fav[1].played > 0 ? getHero(fav[0]).name : '—')),
-      ),
-    ),
-  ));
-  const el = h('div.screen.panel-screen.profile', topBar(app, { title: 'Профиль', back: true }), scroller);
-  return { el, onShow: () => enableDragScroll(scroller) };
+  ), { cls: 'nick-modal' });
+}
+
+/** Выбор аватара: значки и портреты открытых героев. Закрытые герои — с замком. */
+function pickAvatar(app: App, done: () => void) {
+  const s = store.data;
+  let close = () => {};
+  let sel = s.avatar;
+  const R = ['14px 10px 16px 12px', '10px 14px 12px 16px', '16px 12px 14px 10px'];
+  const heroes = playableHeroes().map((d) => ({ id: 'hero:' + d.id, lock: !ownsHero(s, d.id) }));
+  const all = [...heroes, ...AVATARS.map((a) => ({ id: a, lock: false }))];
+  const grid = h('div.av-grid');
+  const render = () => grid.replaceChildren(...all.map((a, i) => {
+    const el = avatarEl(app, a.id, 'pick-av' + (a.id === sel ? ' on' : '') + (a.lock ? ' lock' : ''));
+    el.style.borderRadius = R[i % 3];
+    if (a.lock) el.appendChild(icon('lock', 'a', 'av-lock'));
+    el.addEventListener('click', () => {
+      if (a.lock) { sfx('tick'); toast('Аватар героя открывается вместе с героем', 'info', 'lock'); return; }
+      sel = a.id; sfx('tab'); render();
+    });
+    return el;
+  }));
+  render();
+  close = modal(h('div.col', { style: 'align-items:stretch' },
+    h('div.m-title', 'Выбери аватар'),
+    grid,
+    h('div.daily-foot', h('div.m-small', 'Аватары героев открываются вместе с героем'), btn('Готово', () => { s.avatar = sel; store.commit(); close(); done(); }, 'lime sm')),
+  ), { cls: 'wide av-modal' });
 }

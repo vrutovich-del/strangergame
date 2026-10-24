@@ -3,27 +3,36 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#2b1a5e" />
+  <meta name="theme-color" content="#0f7f86" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Странности" />
-  <meta name="description" content="Командный аркадный шутер: Смайл, Бактерия, Лев и роботы." />
+  <meta name="description" content="Командный аркадный шутер про весёлых странных существ: Смайл, Бактерия, Лев, Шахтёр, Стоп-Тайм и роботы." />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/png" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@800&display=swap" rel="stylesheet" />
   <title>Игра странностей</title>
+  <style>
+    /* загрузка видна до того, как подгрузятся стили игры */
+    html, body { margin: 0; height: 100%; background: #0a5864; }
+    .boot { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+      background: radial-gradient(rgba(255,255,255,.1) 1.4px, transparent 2px) 0 0 / 15px 15px, linear-gradient(160deg, #14979e 0%, #0f7f86 48%, #0a5864 100%); }
+  </style>
 </head>
 <body>
+  <div id="backdrop"></div>
   <canvas id="game"></canvas>
   <div id="ui"></div>
   <div id="boot" class="boot">
-    <div class="boot-logo">Игра<br />странностей</div>
-    <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
-    <div class="boot-tip" id="boot-tip">Загрузка…</div>
+    <div class="boot-logo" id="boot-logo"></div>
+    <div class="boot-load">
+      <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
+      <div class="boot-pct" id="boot-pct">Готовим арену…</div>
+    </div>
+    <div class="boot-tip"><span class="boot-tag">Совет</span><span id="boot-tip"></span></div>
+    <div class="boot-mark" id="boot-mark"></div>
+    <div class="boot-ver" id="boot-ver"></div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>

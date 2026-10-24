@@ -189,6 +189,20 @@ class AudioEngine {
       case 'tab':
         this.tone({ type: 'triangle', f0: 600, f1: 800, dur: 0.06, vol: 0.1 * v });
         break;
+      case 'back':
+        // «назад» — короткий звук вниз
+        this.tone({ type: 'triangle', f0: 820, f1: 520, dur: 0.07, vol: 0.1 * v });
+        break;
+      case 'nope':
+        // «не хватает»: два глухих тона вниз, без резкости
+        this.tone({ type: 'triangle', f0: 330, dur: 0.08, vol: 0.12 * v });
+        this.tone({ type: 'triangle', f0: 247, dur: 0.14, vol: 0.12 * v, at: T + 0.09 });
+        break;
+      case 'stamp':
+        // штамп «Забрано»: шлепок
+        this.noise({ dur: 0.08, vol: 0.22 * v, type: 'lowpass', f0: 900 });
+        this.tone({ type: 'sine', f0: 180, f1: 90, dur: 0.1, vol: 0.2 * v });
+        break;
       case 'coin':
         this.tone({ type: 'square', f0: 988, dur: 0.07, vol: 0.08 * v });
         this.tone({ type: 'square', f0: 1319, dur: 0.18, vol: 0.08 * v, at: T + 0.07 });
@@ -300,7 +314,7 @@ export type SfxName =
   | 'super' | 'super_ready' | 'gem' | 'cube' | 'crate' | 'pop' | 'helpers' | 'sneeze' | 'infect' | 'dash'
   | 'click' | 'tab' | 'coin' | 'buy' | 'levelup' | 'win' | 'lose' | 'tick' | 'countdown' | 'go' | 'emote'
   | 'box_shake' | 'box_open' | 'reward' | 'whoosh' | 'announce' | 'respawn' | 'claw' | 'roar' | 'slam' | 'drop'
-  | 'throw_ball' | 'clock' | 'timestop' | 'pickaxe' | 'clink' | 'spring';
+  | 'throw_ball' | 'clock' | 'timestop' | 'pickaxe' | 'clink' | 'spring' | 'back' | 'nope' | 'stamp';
 
 export const audio = new AudioEngine();
 export const sfx = (name: SfxName, o?: { pitch?: number; vol?: number }) => audio.play(name, o);

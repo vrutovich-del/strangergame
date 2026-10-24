@@ -245,6 +245,16 @@ export function seasonInfo(now = Date.now()) {
   return { season: n + 1, endsAt: ECONOMY.pass.epoch + (n + 1) * len };
 }
 
+/** На каком уровне пропуска этого сезона лежит скин (или null, если его там нет). */
+export function passRewardTier(heroId: string, skinId: string, now = Date.now()): number | null {
+  const rw = passRewards(seasonInfo(now).season);
+  for (const line of [rw.premium, rw.free]) {
+    const i = line.findIndex((r) => r.kind === 'skin' && r.heroId === heroId && r.skinId === skinId);
+    if (i >= 0) return i + 1;
+  }
+  return null;
+}
+
 export function ensureSeason(s: SaveData, now = Date.now()) {
   const { season } = seasonInfo(now);
   if (s.pass.season !== season) s.pass = { season, xp: 0, premium: false, free: [], prem: [] };
@@ -467,16 +477,19 @@ export function notifications(s: SaveData, now = new Date()) {
   };
 }
 
-/** Описание награды для интерфейса. */
+/** Глиф ящика по его виду. */
+export const BOX_ICON: Record<'common' | 'big' | 'mega', string> = { common: 'box1', big: 'box2', mega: 'box3' };
+
+/** Описание награды для интерфейса: icon — глиф из набора иконок. */
 export function rewardLabel(r: Reward | { kind: 'future'; text: string }): { icon: string; text: string } {
   switch (r.kind) {
-    case 'coins': return { icon: '🪙', text: `${r.amount}` };
-    case 'gems': return { icon: '💎', text: `${r.amount}` };
-    case 'bling': return { icon: '✨', text: `${r.amount}` };
-    case 'box': return { icon: '📦', text: ECONOMY.boxes[r.box].name };
-    case 'skin': return { icon: '👕', text: getSkin(r.heroId, r.skinId).name };
-    case 'emote': return { icon: '😀', text: 'Эмоция' };
-    case 'hero': return { icon: '🦸', text: hasHero(r.heroId) ? getHero(r.heroId).name : 'Новый герой' };
-    case 'future': return { icon: '❓', text: r.text };
+    case 'coins': return { icon: 'coin', text: `${r.amount}` };
+    case 'gems': return { icon: 'gem', text: `${r.amount}` };
+    case 'bling': return { icon: 'bling', text: `${r.amount}` };
+    case 'box': return { icon: BOX_ICON[r.box], text: ECONOMY.boxes[r.box].name };
+    case 'skin': return { icon: 'heroes', text: getSkin(r.heroId, r.skinId).name };
+    case 'emote': return { icon: 'emote', text: 'Эмоция' };
+    case 'hero': return { icon: 'heroes', text: hasHero(r.heroId) ? getHero(r.heroId).name : 'Новый герой' };
+    case 'future': return { icon: 'lock', text: r.text };
   }
 }

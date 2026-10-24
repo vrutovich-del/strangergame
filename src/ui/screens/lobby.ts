@@ -1,18 +1,20 @@
-// Главное меню: герой на подиуме, валюты, кнопки разделов, карточка режима и большая кнопка «ИГРАТЬ».
+// Лобби: герой на лаймовом подиуме, профиль и валюты сверху, разделы у левого пальца, «ИГРАТЬ» — под правым.
+import { sfx } from '../../audio/sfx';
 import { getHero } from '../../heroes/registry';
 import { getSkin } from '../../heroes/skins';
 import { mapsForMode } from '../../maps';
 import { MODE_INFO } from '../../modes';
-import { claimLogin, heroProgress, loginAvailable, notifications } from '../../meta/progress';
+import { claimLogin, heroProgress, loginAvailable, notifications, upgradeCost } from '../../meta/progress';
 import { ECONOMY } from '../../meta/economy';
 import { store } from '../../meta/store';
 import type { App } from '../app';
-import { topBar, rewardCard } from '../common';
+import { blobColor, curChip, lvlBadge, profileChip, rarityTag, refreshCurrencies, wallet } from '../common';
 import { btn, h, modal } from '../dom';
+import { icon } from '../icons';
 import type { Screen } from './index';
-import { boxOverlay, rarityBadge } from './boxes';
+import { boxOverlay } from './boxes';
 import { dropOverlay } from './drop';
-import { sfx } from '../../audio/sfx';
+import { dailyBox } from './calendar';
 
 let loginShownThisSession = false;
 
@@ -20,71 +22,85 @@ export function lobbyScreen(app: App): Screen {
   const s = store.data;
   const n = notifications(s);
   const lo = app.selectedLoadout();
-  app.showHero(lo.heroId, lo.skinId);
-  app.showcase.offsetX = 0;
   const hero = getHero(lo.heroId);
   const hp = heroProgress(s, lo.heroId);
-  const dot = (on: boolean) => (on ? h('span.badge-dot') : null);
-  const side = (icon: string, label: string, screen: string, on: boolean, arg?: any) =>
-    btn([h('span.sb-ico', icon), h('span.sb-label', label), dot(on)], () => app.open(screen, arg), 'btn-side');
+  app.showHero(lo.heroId, lo.skinId, 'idle', blobColor(hero.color));
 
-  const drops = s.drops.length
-    ? btn([h('span.sb-ico', '⭐'), h('span.sb-label', 'Дропы'), h('span.badge-num', String(s.drops.length))], () => dropOverlay(app, () => app.refresh()), 'btn-side', { class: 'drop-side' })
-    : null;
-  const left = h('div.lobby-left',
-    side('🛒', 'Магазин', 'shop', n.shop),
-    side('🦸', 'Герои', 'heroes', n.heroes),
-    side('🏆', 'Дорога', 'road', n.road),
+  // разделы: число — сколько можно забрать, точка — есть что-то новое
+  const claimQuests = s.quests.list.filter((q) => !q.claimed && q.progress >= q.target).length + (loginAvailable(s) ? 1 : 0);
+  const sec = (id: string, label: string, bg: string, glyph: string, r: string, rot: string, badge: number | boolean, go: () => void, paper = false) =>
+    h('button.sec' + (paper ? '.paperish' : ''), { onclick: () => { sfx('click'); go(); }, 'aria-label': label },
+      h('div.sec-btn', { style: { background: bg, borderRadius: r, rotate: rot } },
+        icon(glyph, paper ? 'a' : 'b'),
+        typeof badge === 'number' && badge > 0 ? h('div.badge', badge > 9 ? '9+' : String(badge)) : badge === true ? h('div.dot') : null),
+      h('div.sec-label', label));
+  const sections = h('div.sections',
+    sec('shop', 'Магазин', 'var(--tang)', 'bag', '20px 14px 18px 16px', '-2deg', n.shop, () => app.open('shop')),
+    sec('heroes', 'Герои', 'var(--violet)', 'heroes', '14px 20px 16px 18px', '1.5deg', n.heroes, () => app.open('heroes')),
+    sec('road', 'Дорога', 'var(--mint)', 'flag', '18px 16px 20px 14px', '-1deg', n.road, () => app.open('road')),
+    sec('pass', 'Пропуск', 'var(--gum)', 'ticket', '16px 18px 14px 20px', '2deg', n.pass, () => app.open('pass')),
+    sec('quests', 'Задания', 'var(--lime)', 'quests', '20px 16px 18px 14px', '-1.5deg', claimQuests || n.quests, () => app.open('quests')),
+    sec('drops', 'Дропы', 'var(--paper)', 'meteor', '14px 18px 20px 16px', '1deg', s.drops.length, () => openDrops(app), true),
   );
-  const right = h('div.lobby-right',
-    side('🎟️', 'Пропуск', 'pass', n.pass),
-    side('📜', 'Задания', 'quests', n.quests),
-    drops,
-  );
+
   const mode = s.selectedMode;
   const mi = MODE_INFO[mode];
-  const modeCard = h('div.mode-card', { onclick: () => app.open('modes'), style: { background: `linear-gradient(${mi.color}, #2c1d63)` } },
-    h('div.mc-icon', mi.icon),
-    h('div.mc-text', h('div.mc-name.t', mi.name), h('div.mc-sub', mode === 'training' ? 'Любой герой, все скины' : `${mi.short} · карт: ${mapsForMode(mode).length}`)),
-    h('div.mc-arrow', '▶'),
+  const modeCard = h('div.mode-card', { style: { '--mc': mi.color } as any, onclick: () => { sfx('click'); app.open('modes'); } },
+    icon(mi.icon, 'b'),
+    h('div.mc-text', h('div.mc-name', mi.name), h('div.mc-sub', mode === 'training' ? 'Любой герой и скин' : `${mi.short} · карт: ${mapsForMode(mode).length}`)),
+    icon('chev'),
   );
   const play = btn('ИГРАТЬ', () => {
     if (mode === 'training') app.playTraining(lo.heroId, lo.skinId);
     else app.playSolo(mode);
-  }, 'btn-yellow', { class: 'btn-play' });
-  // игра с друзьями — одной кнопкой рядом с «ИГРАТЬ»
-  const friends = btn([h('span.fb-ico', '👥'), h('span.fb-label', 'С ДРУЗЬЯМИ'), dot(!!app.room?.alive)], () => app.open('room'), 'btn-blue', { class: 'btn-friends' });
-  const heroTag = h('div.hero-tag', { onclick: () => app.open('heroes', lo.heroId) },
-    h('div.ht-name.t', getSkin(lo.heroId, lo.skinId).name),
-    h('div.ht-row', h('span.lvl-badge', 'Ур. ' + hp.level), h('span.ht-trophies.t', '🏆 ' + hp.trophies)),
+  }, 'yolk play');
+  const roomOn = !!app.room?.alive;
+  const friends = btn([icon('friends'), roomOn ? 'Комната ' + app.room.code : 'С друзьями', roomOn ? h('div.dot') : null], () => app.open('room'), 'sky friends');
+
+  const cost = upgradeCost(hp.level);
+  const lvlState = cost === null ? 'max' : s.coins >= cost ? 'up' : 'normal';
+  const heroTag = h('div.hero-tag', { onclick: () => { sfx('click'); app.open('heroes', lo.heroId); } },
+    h('div.ht-name', getSkin(lo.heroId, lo.skinId).name),
     h('div.ht-role', hero.role),
-    rarityBadge(hero.rarity ?? 'common'),
+    h('div.ht-row', lvlBadge(hp.level, lvlState === 'max' ? 'max' : lvlState === 'up' ? 'up' : 'normal', `Ур. ${hp.level}`), h('div.ht-tro', icon('trophy'), String(hp.trophies))),
+    rarityTag(hero.rarity ?? 'common'),
   );
-  const settings = btn('⚙️', () => app.open('settings'), 'btn-icon', { class: 'lobby-settings' });
-  const center = h('div.lobby-center');
-  // вращение модели пальцем
-  let drag: { x: number; t: number } | null = null;
-  center.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, t: performance.now() }; center.setPointerCapture(e.pointerId); });
-  center.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    const dx = e.clientX - drag.x;
-    app.showcase.yaw += dx * 0.012;
-    app.showcase.yawVel = (dx * 0.012) / Math.max(0.008, (performance.now() - drag.t) / 1000);
-    drag = { x: e.clientX, t: performance.now() };
-  });
-  center.addEventListener('pointerup', () => { drag = null; });
-  center.addEventListener('pointercancel', () => { drag = null; });
+
+  const stage = h('div.stage.lobby-stage');
+  app.bindSpin(stage);
+  const settings = btn(icon('gear'), () => app.open('settings'), 'sky icon', { 'aria-label': 'Настройки' });
 
   const el = h('div.screen.lobby',
-    topBar(app, { extra: settings }),
-    left, right, center, heroTag,
-    h('div.lobby-bottom', modeCard, play, friends),
+    stage,
+    profileChip(app),
+    h('div.lobby-top', curChip(app, 'coins', 0), curChip(app, 'gems', 1), curChip(app, 'bling', 2), settings),
+    heroTag,
+    sections,
+    h('div.play-col', modeCard, play, friends),
   );
+  const blob = h('div.blob.lobby-blob', { style: { '--blob': blobColor(hero.color) } as any });
+  const podium = h('div.podium.lobby-podium');
+
+  // узкий экран: плашка героя наезжает на лицо — сдвигаем героя, подиум и кляксу левее
+  const layout = () => {
+    if (!el.isConnected) return;
+    const st = stage.getBoundingClientRect(), tag = heroTag.getBoundingClientRect();
+    const half = st.height * 0.3;
+    const shift = Math.max(0, Math.min(st.width / 2 - half, st.left + st.width / 2 - (tag.left - half)));
+    app.showcase.shiftFrac = st.width ? shift / st.width : 0;
+    for (const e of [blob, podium]) e.style.translate = shift ? `${-shift}px 0` : '';
+  };
+  const onResize = () => requestAnimationFrame(layout);
 
   return {
     el,
-    showcase: true,
+    stage,
+    back: [blob, podium],
+    dispose() { window.removeEventListener('resize', onResize); },
     onShow() {
+      window.addEventListener('resize', onResize);
+      onResize();
+      document.fonts?.ready.then(onResize);
       if (!loginShownThisSession && loginAvailable(s)) {
         // не мешаем, если игрок уже ушёл из лобби (например, зашёл в комнату друга по ссылке)
         setTimeout(() => {
@@ -97,24 +113,31 @@ export function lobbyScreen(app: App): Screen {
   };
 }
 
+/** Метеорчики: открыть по очереди или показать пустое состояние. */
+function openDrops(app: App) {
+  if (store.data.drops.length) { dropOverlay(app, () => app.refresh()); return; }
+  let close = () => {};
+  close = modal(h('div.row', { style: 'flex-wrap:nowrap;justify-content:flex-start;gap:16px' },
+    h('div.m-art', { style: 'transform:rotate(-6deg)' }, icon('meteor', 'b')),
+    h('div.col', { style: 'align-items:flex-start;gap:8px' },
+      h('div.m-title', 'Метеорчиков пока нет'),
+      h('div.m-text', 'Побеждай в боях — за каждую победу прилетает Метеорчик.'),
+      btn('В бой', () => { close(); const m = store.data.selectedMode; if (m === 'training') { const lo = app.selectedLoadout(); app.playTraining(lo.heroId, lo.skinId); } else app.playSolo(m); }, 'yolk sm'),
+    ),
+  ));
+}
+
 /** Календарь наград за вход (7 дней). */
 export function showLoginPopup(app: App, after?: () => void) {
   const s = store.data;
-  const days = ECONOMY.login.map((r, i) => h('div.login-day' + (i < s.login.next ? '.done' : '') + (loginAvailable(s) && i === s.login.next ? '.today' : ''),
-    h('div.ld-n', `День ${i + 1}`), rewardCard(r)));
   let close = () => {};
-  const content = h('div.login',
-    h('h2', 'Награда за вход'),
-    h('p.small', 'Заходи каждый день — награды всё лучше!'),
-    h('div.login-days', ...days),
-    loginAvailable(s) ? btn('ЗАБРАТЬ', () => {
-      const r = ECONOMY.login[s.login.next % 7];
-      const got = claimLogin(s);
-      store.commit();
-      close();
-      if (r.kind === 'box' && got) boxOverlay(app, r.box, got, () => { app.refresh(); after?.(); }, 'Награда за вход');
-      else if (got) { sfx('reward'); app.refresh(); after?.(); }
-    }, 'btn-green') : h('p', 'Приходи завтра!'),
-  );
-  close = modal(content, { onClose: () => app.refresh() });
+  const content = dailyBox(app, () => {
+    const r = ECONOMY.login[s.login.next % 7];
+    const before = wallet();
+    const got = claimLogin(s);
+    store.commit();
+    if (r.kind === 'box' && got) { close(); boxOverlay(app, r.box, got, () => { app.refresh(); after?.(); }, 'Награда за вход'); }
+    else if (got) { sfx('reward'); setTimeout(() => { close(); refreshCurrencies(before); after?.(); }, 650); }
+  });
+  close = modal(content, { cls: 'wide daily-modal', onClose: () => app.refresh() });
 }

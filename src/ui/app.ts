@@ -14,13 +14,15 @@ import { cloud } from '../net/cloud';
 import { buildLineup, type HumanEntry } from '../modes/lineup';
 import { prewarm } from '../render/models';
 import { GameRenderer } from '../render/renderer';
-import { renderFace, renderPortrait, Showcase } from '../render/showcase';
+import { renderPortrait, Showcase } from '../render/showcase';
 import { simplifierReady } from '../render/simplify';
 import { Match } from '../sim/match';
 import type { MatchConfig, MatchResult } from '../sim/types';
 import { BattleScreen, LocalSource, type BattleSource } from './battle';
 import type { Nav } from './common';
 import { clear, h, toast } from './dom';
+import { icon, installIcons } from './icons';
+import { logoFull, logoMark } from './logo';
 import { SCREENS, type Screen } from './screens';
 import { boxOpening } from './screens/boxes';
 import { firstRun } from './screens/firstRun';
@@ -28,6 +30,7 @@ import { lobbyScreen } from './screens/lobby';
 import { matchmaking, versus } from './screens/matchmaking';
 import { resultsScreen } from './screens/results';
 import { whatsNew } from './screens/settings';
+import { crashScreen, iosHint, watchOnline } from './screens/system';
 
 const TIPS = [
   'Смайл улыбается даже во сне.',
@@ -39,27 +42,48 @@ const TIPS = [
   'Кристаллы роняет каждый, кого выбили. Подбирай!',
   'Ядовитое облако не любит, когда в нём стоят.',
   'Робо-Танк медленный, но обнимается очень больно.',
+  'Метеорчик раскалывается от тапов. Чем больше тапов — тем ярче свет.',
+  'Стоп-Тайм замораживает даже пули. Беги, пока часы стоят!',
+  'Лев прыгает прямо через стены. Стены не в восторге.',
+  'Шахтёр кидает кирки дугой — ящик тебя не спасёт.',
 ];
 
 export class App implements Nav {
   r!: GameRenderer;
   showcase = new Showcase();
   ui = document.getElementById('ui')!;
+  /** Слой под 3D-холстом: клякса и подиум под героем. */
+  backdrop = document.getElementById('backdrop')!;
   layer = h('div.layer');
   private current: Screen | null = null;
   private currentName = '';
   battle: BattleScreen | null = null;
-  showcaseOn = false;
+  /** Где рисовать 3D-героя меню (область экрана). */
+  stage: HTMLElement | null = null;
   /** Активная комната с друзьями (если есть). */
   room: any = null;
   private bootEl = document.getElementById('boot')!;
 
   async boot() {
+    installIcons();
+    applyMotionSetting();
     const fill = document.getElementById('boot-fill')!;
+    const pct = document.getElementById('boot-pct');
     const tip = document.getElementById('boot-tip')!;
-    tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
-    const tipTimer = setInterval(() => (tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)]), 2600);
-    const progress = (k: number) => (fill.style.width = `${Math.round(k * 100)}%`);
+    const ver = document.getElementById('boot-ver');
+    if (ver) ver.textContent = 'версия ' + GAME_VERSION;
+    const mark = document.getElementById('boot-mark');
+    if (mark) mark.innerHTML = logoMark();
+    let tipN = Math.floor(Math.random() * TIPS.length);
+    tip.textContent = TIPS[tipN];
+    const tipTimer = setInterval(() => {
+      tip.style.opacity = '0';
+      setTimeout(() => { tipN = (tipN + 1) % TIPS.length; tip.textContent = TIPS[tipN]; tip.style.opacity = '1'; }, 250);
+    }, 3000);
+    const progress = (k: number) => {
+      fill.style.width = `${Math.round(k * 100)}%`;
+      if (pct) pct.textContent = (k < 0.3 ? 'Готовим арену… ' : k < 0.95 ? 'Будим героев… ' : 'Почти готово… ') + Math.round(k * 100) + '%';
+    };
     const pause = () => new Promise((res) => setTimeout(res, 30));
     progress(0.05);
     this.r = new GameRenderer(document.getElementById('game') as HTMLCanvasElement);
@@ -69,6 +93,8 @@ export class App implements Nav {
     audio.sfxVolume = s.settings.sfx; audio.musicVolume = s.settings.music; audio.vibration = s.settings.vibration;
     this.r.setQuality(s.settings.quality);
     await Promise.race([document.fonts?.ready, new Promise((res) => setTimeout(res, 2500))]);
+    const logo = document.getElementById('boot-logo');
+    if (logo) logo.innerHTML = logoFull();
     await simplifierReady;
     progress(0.15);
     // модели героев и роботов готовим заранее (бой не будет подтормаживать)
@@ -90,10 +116,15 @@ export class App implements Nav {
     ensureDaily(store.data);
     store.commit();
     this.ui.appendChild(this.layer);
-    this.ui.appendChild(h('div.rotate', h('div.phone'), 'Поверни телефон боком!'));
+    this.ui.appendChild(h('div.rotate',
+      h('div.rot-art', h('div.phone', h('div.phone-mark', { html: logoMark() })), icon('refresh', 'b', 'rot-arrow')),
+      h('div.r-title', 'Поверни телефон'),
+      h('div.r-sub', 'Игра — только лёжа: так видно всю арену и обе руки на месте.'),
+    ));
     this.installUnlock();
+    watchOnline();
     startLoop((dt, now) => this.frame(dt, now));
-    setTimeout(() => { this.bootEl.classList.add('hide'); setTimeout(() => this.bootEl.remove(), 500); }, 150);
+    setTimeout(() => { this.bootEl.classList.add('hide'); setTimeout(() => this.bootEl.remove(), 300); }, 150);
     this.afterBoot();
   }
 
@@ -107,6 +138,7 @@ export class App implements Nav {
     const score = (data: string) => { try { return progressScore(migrate(JSON.parse(data))); } catch { return -1; } };
     return cloud.attach(() => store.data, (data) => {
       store.replace(migrate(JSON.parse(data)));
+      applyMotionSetting();
       // если сверка закончилась уже в меню — перерисуем его
       if (this.currentName === 'lobby') this.toLobby();
     }, score);
@@ -140,9 +172,10 @@ export class App implements Nav {
       return;
     }
     this.toLobby();
-    if (s.lastVersion && s.lastVersion !== GAME_VERSION) whatsNew();
+    if (s.lastVersion && s.lastVersion !== GAME_VERSION) whatsNew(this);
     if (s.lastVersion !== GAME_VERSION) { s.lastVersion = GAME_VERSION; store.commit(); }
     if (roomCode) this.open('room', { join: roomCode });
+    else iosHint();
   }
 
   private showFirstRun(roomCode: string | null) {
@@ -151,17 +184,22 @@ export class App implements Nav {
       store.commit();
       this.toLobby();
       if (roomCode) this.open('room', { join: roomCode });
+      else iosHint();
     }));
   }
 
   // ───────────── экраны ─────────────
-  private setScreen(name: string, scr: Screen) {
-    this.current?.dispose?.();
+  setScreen(name: string, scr: Screen) {
+    try { this.current?.dispose?.(); } catch (e) { console.error(e); }
     clear(this.layer);
+    clear(this.backdrop);
     this.current = scr;
     this.currentName = name;
+    if (scr.back) for (const b of scr.back) this.backdrop.appendChild(b);
+    scr.el.classList.add('enter');
     this.layer.appendChild(scr.el);
-    this.showcaseOn = !!scr.showcase;
+    setTimeout(() => scr.el.classList.remove('enter'), 400);
+    this.stage = scr.stage ?? null;
     document.body.classList.toggle('menu-bg', !this.battle);
     scr.onShow?.();
   }
@@ -170,9 +208,9 @@ export class App implements Nav {
     return renderPortrait(this.r.gl, heroId, skinId, team);
   }
 
-  /** Портрет «по плечи» для сетки героев. */
-  face(heroId: string, skinId = 'default') {
-    return renderFace(this.r.gl, heroId, skinId);
+  /** Крупный портрет (для полноэкранных наград). */
+  bigPortrait(heroId: string, skinId = 'default') {
+    return renderPortrait(this.r.gl, heroId, skinId, 'blue', 512);
   }
 
   toLobby() {
@@ -183,12 +221,12 @@ export class App implements Nav {
   open(name: string, arg?: any) {
     if (name === 'lobby') return this.toLobby();
     const make = SCREENS[name];
-    if (!make) { toast('Экран не найден'); return; }
+    if (!make) { toast('Этот раздел ещё в пути'); return; }
     sfx('whoosh');
     this.setScreen(name, make(this, arg));
   }
 
-  back() { this.toLobby(); }
+  back() { sfx('back'); this.toLobby(); }
 
   /** Какой экран сейчас открыт. */
   get screenName() { return this.currentName; }
@@ -213,7 +251,6 @@ export class App implements Nav {
     this.requestFullscreen();
     const human: HumanEntry = { name: s.nick || 'Игрок', heroId: lo.heroId, skinId: lo.skinId, level: lo.level, owner: 'local' };
     const cfg = buildLineup({ mode, humans: [human], difficulty: difficultyFor(s, lo.heroId), seed: randomSeed() });
-    this.showcaseOn = false;
     this.setScreen('mm', matchmaking(this, cfg, () => {
       this.setScreen('vs', versus(this, cfg, 'local', () => this.startLocal(cfg)));
     }));
@@ -234,11 +271,12 @@ export class App implements Nav {
   }
 
   startBattle(src: BattleSource) {
-    this.current?.dispose?.();
+    try { this.current?.dispose?.(); } catch (e) { console.error(e); }
     clear(this.layer);
+    clear(this.backdrop);
     this.current = null;
     this.currentName = 'battle';
-    this.showcaseOn = false;
+    this.stage = null;
     document.body.classList.remove('menu-bg');
     const s = store.data;
     this.battle = new BattleScreen(this.r, src, {
@@ -263,7 +301,7 @@ export class App implements Nav {
         s.giftBoxGiven = true;
         const gift = starterGift(s);
         store.commit();
-        this.setScreen('gift', boxOpening(this, 'big', () => this.afterRoomOrLobby(), 'Подарок за обучение!', gift));
+        this.setScreen('gift', boxOpening(this, 'big', () => this.afterRoomOrLobby(), 'Подарок за обучение', gift, true));
         return;
       }
       store.commit();
@@ -280,7 +318,12 @@ export class App implements Nav {
       store.commit();
     }
     if (res.reason === 'quit') { this.afterRoomOrLobby(); return; }
-    this.setScreen('results', resultsScreen(this, res, src, rewards, () => this.afterRoomOrLobby()));
+    this.setScreen('results', resultsScreen(this, res, src, rewards, () => this.afterRoomOrLobby(), () => {
+      // «Играть снова»: тот же режим (с друзьями — назад в комнату)
+      if (this.room && this.room.alive) this.open('room', { back: true });
+      else if (res.mode === 'training') this.toLobby();
+      else this.playSolo(res.mode);
+    }));
   }
 
   private afterRoomOrLobby() {
@@ -296,20 +339,59 @@ export class App implements Nav {
       return;
     }
     const gl = this.r.gl;
-    if (this.showcaseOn) {
-      this.showcase.update(dt);
-      gl.setViewport(0, 0, this.r.width, this.r.height);
-      this.showcase.render(gl, this.r.width, this.r.height);
-    } else {
-      gl.clear();
+    gl.setScissorTest(false);
+    gl.setViewport(0, 0, this.r.width, this.r.height);
+    gl.clear();
+    const st = this.stage;
+    if (st && st.isConnected && !document.hidden) {
+      const r = st.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4) {
+        this.showcase.update(dt);
+        // область в координатах WebGL (начало — снизу слева)
+        const y = this.r.height - r.bottom;
+        gl.setViewport(r.left, y, r.width, r.height);
+        gl.setScissor(Math.max(0, r.left), Math.max(0, y), r.width, r.height);
+        gl.setScissorTest(true);
+        this.showcase.render(gl, r.width, r.height);
+        gl.setScissorTest(false);
+        gl.setViewport(0, 0, this.r.width, this.r.height);
+      }
     }
     this.current?.frame?.(dt);
   }
 
-  /** Показать на подиуме выбранного героя. */
-  showHero(heroId: string, skinId: string, mode: 'idle' | 'win' | 'lose' = 'idle') {
+  /** Показать на подиуме героя. ground — цвет кляксы (свет снизу в её тон). */
+  showHero(heroId: string, skinId: string, mode: 'idle' | 'win' | 'lose' = 'idle', ground?: string) {
     this.showcase.set([{ heroId, skinId }], mode);
+    this.showcase.yaw = 0;
+    this.showcase.offsetX = 0;
+    this.showcase.fit = 0.8;
+    if (ground) this.showcase.setGround(ground);
+  }
+
+  /** Крутить героя пальцем; тап — радость. */
+  bindSpin(el: HTMLElement) {
+    let drag: { x: number; t: number; moved: number } | null = null;
+    el.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, t: performance.now(), moved: 0 }; el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      drag.moved += Math.abs(dx);
+      this.showcase.yaw += dx * 0.012;
+      this.showcase.yawVel = (dx * 0.012) / Math.max(0.008, (performance.now() - drag.t) / 1000);
+      drag.x = e.clientX; drag.t = performance.now();
+    });
+    el.addEventListener('pointerup', () => { if (drag && drag.moved < 6) { this.showcase.cheer(); sfx('emote'); } drag = null; });
+    el.addEventListener('pointercancel', () => { drag = null; });
   }
 
   skinsFor(heroId: string) { return skinsOf(heroId); }
+
+  /** Общая ошибка «Что-то пошло не так» с кнопкой «Обновить». */
+  crash() { crashScreen(); }
+}
+
+/** «Меньше анимаций»: атрибут на корне документа включает короткие проявления вместо сдвигов. */
+export function applyMotionSetting() {
+  document.documentElement.toggleAttribute('data-less-motion', !!store.data.settings.lessMotion);
 }

@@ -11,8 +11,13 @@ import { shopScreen } from './shop';
 
 export interface Screen {
   el: HTMLElement;
-  /** Показывать 3D-подиум за экраном. */
-  showcase?: boolean;
+  /**
+   * Область, в которой витрина рисует 3D-героя (он стоит ногами на её нижнем крае).
+   * Если её нет — 3D в меню не рисуется.
+   */
+  stage?: HTMLElement;
+  /** Что лежит под 3D-героем: клякса и лаймовый подиум (слой под холстом). */
+  back?: HTMLElement[];
   dispose?(): void;
   onShow?(): void;
   frame?(dt: number): void;
